@@ -17,9 +17,9 @@ module.exports = {
         use: {
           loader: 'ts-loader',
           options: {
-            transpileOnly: true
-          }
-        }
+            transpileOnly: true,
+          },
+        },
       },
       {
         test: /\.(ts|tsx|js|jsx)?$/,
@@ -37,22 +37,15 @@ module.exports = {
       },
       {
         test: /\.(png|jpe?g|gif|svg)$/i,
-        use: {
-          loader: 'url-loader',
-          options: {
-            limit: 8192,
-          },
-        },
-        exclude: /node_modules/,
+        type: 'asset/resource',
       },
       {
         test: /\.(woff|woff2|eot|ttf|otf)$/,
-        use: 'file-loader',
-        exclude: /node_modules/,
+        type: 'asset/resource',
       },
       {
         test: /\.(s?css)$/i,
-        use: ['style-loader', 'css-loader', 'sass-loader'],
+        use: ['style-loader', 'css-loader'],
         exclude: /node_modules/,
       },
     ],
