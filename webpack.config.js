@@ -1,5 +1,5 @@
-const path = require('path')
-const HtmlWebapackPlugin = require('html-webpack-plugin')
+const path = require('path');
+const HtmlWebapackPlugin = require('html-webpack-plugin');
 
 module.exports = {
   mode: 'development',
@@ -8,6 +8,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'build'),
     filename: 'bundle.js',
+    publicPath: '/',
   },
   module: {
     rules: [
@@ -62,4 +63,4 @@ module.exports = {
     compress: true,
     historyApiFallback: true,
   },
-}
+};
