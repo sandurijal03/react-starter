@@ -2,6 +2,29 @@ const path = require("path");
 const { pathToFileURL } = require("url");
 const { app, BrowserWindow, Menu, dialog, ipcMain } = require("electron");
 
+function bindWindowTitleToDocument(mainWindow) {
+  const applyDocumentTitle = () => {
+    mainWindow.webContents
+      .executeJavaScript("document.title")
+      .then((title) => {
+        if (typeof title === "string" && title.trim()) {
+          mainWindow.setTitle(title.trim());
+        }
+      })
+      .catch(() => {
+        // Ignore title sync failures (e.g. transient navigation states).
+      });
+  };
+
+  mainWindow.webContents.on("did-finish-load", applyDocumentTitle);
+  mainWindow.on("page-title-updated", (event, title) => {
+    event.preventDefault();
+    if (typeof title === "string" && title.trim()) {
+      mainWindow.setTitle(title.trim());
+    }
+  });
+}
+
 function openUrlPrompt(mainWindow, initialUrl) {
   return new Promise((resolve) => {
     const promptWindow = new BrowserWindow({
@@ -154,6 +177,8 @@ function createWindow() {
     },
     show: false,
   });
+
+  bindWindowTitleToDocument(mainWindow);
 
   createAppMenu(mainWindow);
 

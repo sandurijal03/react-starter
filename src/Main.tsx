@@ -156,6 +156,8 @@ const FIT_THRESHOLD_STORAGE_KEY = "vr_player_fit_threshold";
 const MIN_FIT_THRESHOLD = 0.05;
 const MAX_FIT_THRESHOLD = 0.5;
 const DEFAULT_FIT_THRESHOLD = 0.22;
+const KEYBOARD_SEEK_STEP_SECONDS = 10;
+const KEYBOARD_VOLUME_STEP = 0.05;
 
 const clampFitThreshold = (value: number): number =>
   Math.min(MAX_FIT_THRESHOLD, Math.max(MIN_FIT_THRESHOLD, value));
@@ -1030,6 +1032,102 @@ const Main: React.FC = () => {
       setStatus("Fullscreen action was blocked by the browser.");
     }
   };
+
+  const seekBySeconds = React.useCallback((deltaSeconds: number): void => {
+    const video = videoRef.current;
+    if (!video || loadedMediaRef.current !== "video") {
+      return;
+    }
+
+    if (!Number.isFinite(video.duration) || video.duration <= 0) {
+      return;
+    }
+
+    const next = Math.min(
+      video.duration,
+      Math.max(0, video.currentTime + deltaSeconds),
+    );
+    video.currentTime = next;
+    setTimelineCurrent(next);
+  }, []);
+
+  const adjustVolumeByStep = React.useCallback((delta: number): void => {
+    const video = videoRef.current;
+    if (!video || loadedMediaRef.current !== "video") {
+      return;
+    }
+
+    const next = Math.min(1, Math.max(0, video.volume + delta));
+    video.volume = next;
+    setVolume(next);
+
+    if (next > 0 && video.muted) {
+      video.muted = false;
+      setIsMuted(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
+      ) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        const isTextEntryTarget =
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          tag === "BUTTON" ||
+          target.isContentEditable;
+
+        if (isTextEntryTarget) {
+          return;
+        }
+      }
+
+      if (event.code === "Space") {
+        event.preventDefault();
+        void togglePlayback();
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        seekBySeconds(-KEYBOARD_SEEK_STEP_SECONDS);
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        seekBySeconds(KEYBOARD_SEEK_STEP_SECONDS);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        adjustVolumeByStep(KEYBOARD_VOLUME_STEP);
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        adjustVolumeByStep(-KEYBOARD_VOLUME_STEP);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [adjustVolumeByStep, seekBySeconds, togglePlayback]);
 
   return (
     <>

@@ -12,8 +12,9 @@
     "electron": "electron .",
     "electron:dev": "concurrently -k \"npm run web:dev\" \"wait-on build/index.html && nodemon --watch build --ext js,html --exec \\\"electron .\\\"\"",
     "electron:dev:server": "concurrently -k \"npm run web:server\" \"wait-on tcp:5000 && cross-env ELECTRON_START_URL=http://localhost:5000 electron .\"",
+    "prepackage:win": "node scripts/prepackage-win.js",
     "package:dir": "npm run build && electron-builder --dir --win",
-    "package:win": "npm run build && electron-builder --win"
+    "package:win": "npm run build && node scripts/package-win.js"
   },
   "keywords": [
     "electron",
@@ -22,13 +23,13 @@
     "vr",
     "video-player"
   ],
-  "author": "VR Player App Team",
+  "author": "Sandip Rijal",
   "license": "ISC",
   "build": {
     "appId": "com.reactstarter.vrplayer",
     "productName": "VR Player App",
     "artifactName": "${productName}-Setup-${version}.${ext}",
-    "copyright": "Copyright (c) 2026 VR Player App",
+    "copyright": "Copyright (c) 2026 Sandip Rijal",
     "directories": {
       "output": "release",
       "buildResources": "buildResources"

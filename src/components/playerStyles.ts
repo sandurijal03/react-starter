@@ -78,7 +78,7 @@ export const HeroPanel = styled.section`
 
 export const ControlsPanel = styled.section<{ $insidePlayer?: boolean }>`
   ${panelSurface}
-  padding: 0.95rem;
+  padding: 0.62rem;
 
   ${({ $insidePlayer }) =>
     $insidePlayer
@@ -92,11 +92,220 @@ export const ControlsPanel = styled.section<{ $insidePlayer?: boolean }>`
 
   label {
     display: block;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     color: var(--ink-soft);
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.25rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+  }
+`;
+
+export const CompactToolbar = styled.div`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  margin-bottom: 0.52rem;
+`;
+
+export const ToolbarGroup = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+`;
+
+export const CompactSelect = styled.select`
+  border-radius: 6px;
+  border: 1px solid var(--divider);
+  background: #17191d;
+  color: var(--ink);
+  min-width: 124px;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.82rem;
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--ring);
+    border-color: var(--accent);
+  }
+
+  @media (max-width: ${MOBILE_BREAKPOINT}) {
+    min-width: 100px;
+  }
+`;
+
+export const IconButton = styled.button<{ $active?: boolean }>`
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid
+    ${({ $active }) =>
+      $active ? "rgba(255, 143, 0, 0.75)" : "rgba(255, 255, 255, 0.18)"};
+  background: ${({ $active }) =>
+    $active ? "rgba(255, 143, 0, 0.16)" : "rgba(20, 23, 28, 0.9)"};
+  color: ${({ $active }) => ($active ? "#ffd7a3" : "#e7eaf0")};
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+
+  svg {
+    width: 17px;
+    height: 17px;
+    fill: currentColor;
+  }
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(255, 143, 0, 0.75);
+    box-shadow: 0 0 0 2px rgba(255, 143, 0, 0.18);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+    transform: none;
+  }
+`;
+
+export const IconFileLabel = styled.label`
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(20, 23, 28, 0.9);
+  color: #e7eaf0;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+
+  svg {
+    width: 17px;
+    height: 17px;
+    fill: currentColor;
+  }
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 143, 0, 0.75);
+    box-shadow: 0 0 0 2px rgba(255, 143, 0, 0.18);
+  }
+`;
+
+export const CompactVolumeSlider = styled.input`
+  accent-color: var(--accent);
+  width: 96px;
+`;
+
+export const MenuPopover = styled.details`
+  position: relative;
+`;
+
+export const MenuPopoverButton = styled.summary<{ $active?: boolean }>`
+  list-style: none;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid
+    ${({ $active }) =>
+      $active ? "rgba(255, 143, 0, 0.75)" : "rgba(255, 255, 255, 0.18)"};
+  background: ${({ $active }) =>
+    $active ? "rgba(255, 143, 0, 0.16)" : "rgba(20, 23, 28, 0.9)"};
+  color: ${({ $active }) => ($active ? "#ffd7a3" : "#e7eaf0")};
+  cursor: pointer;
+
+  svg {
+    width: 17px;
+    height: 17px;
+    fill: currentColor;
+  }
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+
+  &:hover {
+    border-color: rgba(255, 143, 0, 0.75);
+  }
+`;
+
+export const MenuPopoverPanel = styled.div`
+  display: none;
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  min-width: min(290px, 80vw);
+  padding: 0.56rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(
+    180deg,
+    rgba(21, 23, 27, 0.98),
+    rgba(16, 18, 22, 0.98)
+  );
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.42);
+  z-index: 20;
+
+  ${MenuPopover}[open] & {
+    display: block;
+  }
+`;
+
+export const PopoverTitle = styled.p`
+  margin: 0 0 0.44rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+`;
+
+export const PopoverRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  margin-bottom: 0.45rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+export const PopoverText = styled.span`
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+`;
+
+export const MiniButton = styled.button`
+  border: 1px solid rgba(255, 143, 0, 0.65);
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #18130b;
+  background: linear-gradient(180deg, #ff9f1a, #ff7f00);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--accent-strong);
+  }
+
+  &:disabled {
+    opacity: 0.62;
+    cursor: not-allowed;
   }
 `;
 
@@ -321,7 +530,7 @@ export const TimelineRow = styled.div`
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0.6rem;
-  margin-top: 0.6rem;
+  margin-top: 0.45rem;
 
   label {
     margin: 0;
@@ -345,14 +554,14 @@ export const TimelineText = styled.span`
 `;
 
 export const StatusText = styled.p`
-  margin: 0.45rem 0 0;
-  font-size: 0.86rem;
+  margin: 0.38rem 0 0;
+  font-size: 0.8rem;
   color: #dde1e7;
 `;
 
 export const StatusSubtle = styled.p`
-  margin: 0.25rem 0 0;
-  font-size: 0.76rem;
+  margin: 0.17rem 0 0;
+  font-size: 0.72rem;
   color: var(--ink-soft);
 `;
 
@@ -368,7 +577,7 @@ export const ViewerControlsWrap = styled.div`
 
 export const ViewerCanvas = styled.div`
   width: 100%;
-  height: clamp(360px, calc(100vh - 260px), 920px);
+  height: clamp(400px, calc(100vh - 220px), 980px);
   border-radius: 6px;
   overflow: hidden;
   background: #000;

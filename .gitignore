@@ -3,6 +3,6 @@ build
 yarn.lock
 package-lock.json
 
-release
+release*
 dist
 scripts
