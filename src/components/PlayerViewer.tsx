@@ -15,16 +15,64 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
   controls,
   isFullscreen = false,
 }) => {
-  const shouldShowControls = !isFullscreen;
+  const [showFloatingControls, setShowFloatingControls] =
+    React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (!isFullscreen) {
+      setShowFloatingControls(true);
+      return;
+    }
+
+    setShowFloatingControls(false);
+  }, [isFullscreen]);
+
+  const onViewerMouseMove = (event: React.MouseEvent<HTMLElement>): void => {
+    if (!isFullscreen) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const activationBandHeight = Math.min(180, rect.height * 0.3);
+    const shouldShow = event.clientY >= rect.bottom - activationBandHeight;
+    setShowFloatingControls(shouldShow);
+  };
+
+  const onViewerMouseLeave = (): void => {
+    if (!isFullscreen) {
+      return;
+    }
+
+    setShowFloatingControls(false);
+  };
+
+  const onViewerTouchStart = (): void => {
+    if (!isFullscreen) {
+      return;
+    }
+
+    setShowFloatingControls(true);
+  };
+
+  const showControls = !isFullscreen || showFloatingControls;
 
   return (
     <ViewerPanel
       ref={shellRef as React.RefObject<HTMLDivElement>}
       $isFullscreen={isFullscreen}
+      onMouseMove={onViewerMouseMove}
+      onMouseLeave={onViewerMouseLeave}
+      onTouchStart={onViewerTouchStart}
     >
       <ViewerCanvas ref={mountRef} $isFullscreen={isFullscreen} />
-      {controls && shouldShowControls ? (
-        <ViewerControlsWrap>{controls}</ViewerControlsWrap>
+      {controls ? (
+        <ViewerControlsWrap
+          $floating={isFullscreen}
+          $visible={showControls}
+          aria-hidden={!showControls}
+        >
+          {controls}
+        </ViewerControlsWrap>
       ) : null}
     </ViewerPanel>
   );

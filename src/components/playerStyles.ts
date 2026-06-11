@@ -567,6 +567,7 @@ export const StatusSubtle = styled.p`
 
 export const ViewerPanel = styled.section<{ $isFullscreen?: boolean }>`
   ${panelSurface}
+  position: relative;
   padding: ${({ $isFullscreen }) => ($isFullscreen ? '0' : '0.38rem')};
   overflow: hidden;
 
@@ -581,8 +582,26 @@ export const ViewerPanel = styled.section<{ $isFullscreen?: boolean }>`
       : ''}
 `;
 
-export const ViewerControlsWrap = styled.div`
-  margin-top: 0.38rem;
+export const ViewerControlsWrap = styled.div<{
+  $floating?: boolean;
+  $visible?: boolean;
+}>`
+  margin-top: ${({ $floating }) => ($floating ? '0' : '0.38rem')};
+
+  ${({ $floating, $visible }) =>
+    $floating
+      ? `
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+    opacity: ${$visible ? '1' : '0'};
+    transform: translateY(${$visible ? '0' : '12px'});
+    pointer-events: ${$visible ? 'auto' : 'none'};
+    transition: opacity 160ms ease, transform 160ms ease;
+  `
+      : ''}
 `;
 
 export const ViewerCanvas = styled.div<{ $isFullscreen?: boolean }>`
