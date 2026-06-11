@@ -18,8 +18,11 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
   const shouldShowControls = !isFullscreen;
 
   return (
-    <ViewerPanel ref={shellRef as React.RefObject<HTMLDivElement>}>
-      <ViewerCanvas ref={mountRef} />
+    <ViewerPanel
+      ref={shellRef as React.RefObject<HTMLDivElement>}
+      $isFullscreen={isFullscreen}
+    >
+      <ViewerCanvas ref={mountRef} $isFullscreen={isFullscreen} />
       {controls && shouldShowControls ? (
         <ViewerControlsWrap>{controls}</ViewerControlsWrap>
       ) : null}

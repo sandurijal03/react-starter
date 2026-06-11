@@ -1,6 +1,6 @@
-import styled, { createGlobalStyle, css } from "styled-components";
+import styled, { createGlobalStyle, css } from 'styled-components';
 
-const MOBILE_BREAKPOINT = "720px";
+const MOBILE_BREAKPOINT = '720px';
 
 const panelSurface = css`
   background: linear-gradient(180deg, var(--panel), var(--panel-2));
@@ -88,7 +88,7 @@ export const ControlsPanel = styled.section<{ $insidePlayer?: boolean }>`
     box-shadow: none;
     background: linear-gradient(180deg, rgba(35, 38, 43, 0.94), rgba(27, 29, 33, 0.96));
   `
-      : ""}
+      : ''}
 
   label {
     display: block;
@@ -144,10 +144,10 @@ export const IconButton = styled.button<{ $active?: boolean }>`
   border-radius: 6px;
   border: 1px solid
     ${({ $active }) =>
-      $active ? "rgba(255, 143, 0, 0.75)" : "rgba(255, 255, 255, 0.18)"};
+      $active ? 'rgba(255, 143, 0, 0.75)' : 'rgba(255, 255, 255, 0.18)'};
   background: ${({ $active }) =>
-    $active ? "rgba(255, 143, 0, 0.16)" : "rgba(20, 23, 28, 0.9)"};
-  color: ${({ $active }) => ($active ? "#ffd7a3" : "#e7eaf0")};
+    $active ? 'rgba(255, 143, 0, 0.16)' : 'rgba(20, 23, 28, 0.9)'};
+  color: ${({ $active }) => ($active ? '#ffd7a3' : '#e7eaf0')};
   cursor: pointer;
   transition:
     transform 120ms ease,
@@ -221,10 +221,10 @@ export const MenuPopoverButton = styled.summary<{ $active?: boolean }>`
   border-radius: 6px;
   border: 1px solid
     ${({ $active }) =>
-      $active ? "rgba(255, 143, 0, 0.75)" : "rgba(255, 255, 255, 0.18)"};
+      $active ? 'rgba(255, 143, 0, 0.75)' : 'rgba(255, 255, 255, 0.18)'};
   background: ${({ $active }) =>
-    $active ? "rgba(255, 143, 0, 0.16)" : "rgba(20, 23, 28, 0.9)"};
-  color: ${({ $active }) => ($active ? "#ffd7a3" : "#e7eaf0")};
+    $active ? 'rgba(255, 143, 0, 0.16)' : 'rgba(20, 23, 28, 0.9)'};
+  color: ${({ $active }) => ($active ? '#ffd7a3' : '#e7eaf0')};
   cursor: pointer;
 
   svg {
@@ -565,23 +565,35 @@ export const StatusSubtle = styled.p`
   color: var(--ink-soft);
 `;
 
-export const ViewerPanel = styled.section`
+export const ViewerPanel = styled.section<{ $isFullscreen?: boolean }>`
   ${panelSurface}
-  padding: 0.38rem;
+  padding: ${({ $isFullscreen }) => ($isFullscreen ? '0' : '0.38rem')};
   overflow: hidden;
+
+  ${({ $isFullscreen }) =>
+    $isFullscreen
+      ? `
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #000;
+  `
+      : ''}
 `;
 
 export const ViewerControlsWrap = styled.div`
   margin-top: 0.38rem;
 `;
 
-export const ViewerCanvas = styled.div`
+export const ViewerCanvas = styled.div<{ $isFullscreen?: boolean }>`
   width: 100%;
-  height: clamp(400px, calc(100vh - 220px), 980px);
-  border-radius: 6px;
+  height: ${({ $isFullscreen }) =>
+    $isFullscreen ? '100vh' : 'clamp(400px, calc(100vh - 220px), 980px)'};
+  border-radius: ${({ $isFullscreen }) => ($isFullscreen ? '0' : '6px')};
   overflow: hidden;
   background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: ${({ $isFullscreen }) =>
+    $isFullscreen ? '0' : '1px solid rgba(255, 255, 255, 0.12)'};
   position: relative;
 
   canvas {
@@ -599,7 +611,7 @@ export const ViewerCanvas = styled.div`
     background: rgba(22, 24, 28, 0.94) !important;
     border: 1px solid rgba(255, 143, 0, 0.7) !important;
     color: #ffc57d !important;
-    font-family: "Ubuntu", sans-serif !important;
+    font-family: 'Ubuntu', sans-serif !important;
     font-size: 12px !important;
     letter-spacing: 0.03em;
   }
