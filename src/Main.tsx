@@ -264,6 +264,8 @@ const Main: React.FC = () => {
   const [timelineDuration, setTimelineDuration] = React.useState<number>(0);
   const [xrSupported, setXrSupported] = React.useState<boolean | null>(null);
   const [isFullscreen, setIsFullscreen] = React.useState<boolean>(false);
+  const [isWindowFullscreen, setIsWindowFullscreen] =
+    React.useState<boolean>(false);
 
   const setLoadedMedia = React.useCallback((value: LoadedMedia): void => {
     loadedMediaRef.current = value;
@@ -327,6 +329,37 @@ const Main: React.FC = () => {
       document.removeEventListener('fullscreenchange', onFullscreenChange);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!isDesktopApp || !window.electronAPI) {
+      return;
+    }
+
+    let active = true;
+
+    void (async () => {
+      try {
+        const next = await window.electronAPI?.getWindowFullscreen();
+        if (active) {
+          setIsWindowFullscreen(Boolean(next));
+        }
+      } catch {
+        // Ignore desktop bridge failures and continue with DOM fullscreen only.
+      }
+    })();
+
+    const disposeWindowFullscreenListener =
+      window.electronAPI.onWindowFullscreenChange((next) => {
+        setIsWindowFullscreen(next);
+      });
+
+    return () => {
+      active = false;
+      disposeWindowFullscreenListener();
+    };
+  }, [isDesktopApp]);
+
+  const isAnyFullscreen = isFullscreen || isWindowFullscreen;
 
   React.useEffect(() => {
     const mountEl = mountRef.current;
@@ -1136,7 +1169,7 @@ const Main: React.FC = () => {
         <PlayerViewer
           shellRef={playerShellRef}
           mountRef={mountRef}
-          isFullscreen={isFullscreen}
+          isFullscreen={isAnyFullscreen}
           controls={
             <PlayerControls
               insidePlayer
@@ -1151,7 +1184,7 @@ const Main: React.FC = () => {
               loadedMedia={loadedMedia}
               isPlaying={isPlaying}
               isMuted={isMuted}
-              isFullscreen={isFullscreen}
+              isFullscreen={isAnyFullscreen}
               volume={volume}
               timelineCurrent={timelineCurrent}
               timelineDuration={timelineDuration}

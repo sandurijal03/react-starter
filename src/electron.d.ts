@@ -5,8 +5,12 @@ declare global {
     electronAPI?: {
       isDesktop: boolean;
       requestMediaUrl: (initialUrl: string) => Promise<string | null>;
+      getWindowFullscreen: () => Promise<boolean>;
       onMenuOpenFile: (callback: (fileUrl: string) => void) => () => void;
       onMenuOpenUrl: (callback: () => void) => () => void;
+      onWindowFullscreenChange: (
+        callback: (isFullscreen: boolean) => void,
+      ) => () => void;
     };
   }
 }
