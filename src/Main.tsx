@@ -1,19 +1,19 @@
-import * as React from "react";
-import * as THREE from "three";
-import { VRButton } from "three/examples/jsm/webxr/VRButton.js";
-import PlayerControls from "./components/PlayerControls";
-import { GlobalStyle, PlayerRoot } from "./components/playerStyles";
-import PlayerViewer from "./components/PlayerViewer";
+import * as React from 'react';
+import * as THREE from 'three';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import PlayerControls from './components/PlayerControls';
+import { GlobalStyle, PlayerRoot } from './components/playerStyles';
+import PlayerViewer from './components/PlayerViewer';
 import {
   LoadedMedia,
   MediaHint,
   ProjectionMode,
   StereoLayout,
-} from "./types/player";
+} from './types/player';
 
 type XRNavigator = Navigator & {
   xr?: {
-    isSessionSupported: (mode: "immersive-vr") => Promise<boolean>;
+    isSessionSupported: (mode: 'immersive-vr') => Promise<boolean>;
   };
 };
 
@@ -32,7 +32,7 @@ const formatTime = (seconds: number): string => {
     value < 10 ? `0${value}` : String(value);
 
   if (!Number.isFinite(seconds) || seconds < 0) {
-    return "00:00";
+    return '00:00';
   }
 
   const wholeSeconds = Math.floor(seconds);
@@ -51,30 +51,30 @@ const inferMediaType = (
   value: string,
   hint: MediaHint,
 ): Exclude<LoadedMedia, null> => {
-  if (hint === "video") {
-    return "video";
+  if (hint === 'video') {
+    return 'video';
   }
 
-  if (hint === "image") {
-    return "image";
+  if (hint === 'image') {
+    return 'image';
   }
 
   if (IMAGE_EXTENSIONS.test(value)) {
-    return "image";
+    return 'image';
   }
 
   if (VIDEO_EXTENSIONS.test(value)) {
-    return "video";
+    return 'video';
   }
 
-  return "video";
+  return 'video';
 };
 
 const createProjectionGeometry = (
   mode: ProjectionMode,
 ): THREE.SphereGeometry => {
   const geometry =
-    mode === "180"
+    mode === '180'
       ? new THREE.SphereGeometry(500, 72, 48, -Math.PI / 2, Math.PI)
       : new THREE.SphereGeometry(500, 72, 48);
 
@@ -130,14 +130,14 @@ const applyStereoLayoutToTextureSet = (
     texture.needsUpdate = true;
   }
 
-  if (layout === "left-right") {
+  if (layout === 'left-right') {
     set.left.repeat.set(0.5, 1);
     set.left.offset.set(swapEyes ? 0.5 : 0, 0);
     set.right.repeat.set(0.5, 1);
     set.right.offset.set(swapEyes ? 0 : 0.5, 0);
   }
 
-  if (layout === "top-bottom") {
+  if (layout === 'top-bottom') {
     set.left.repeat.set(1, 0.5);
     set.left.offset.set(0, swapEyes ? 0 : 0.5);
     set.right.repeat.set(1, 0.5);
@@ -149,10 +149,10 @@ const applyStereoLayoutToTextureSet = (
 };
 
 const DEFAULT_SOURCE =
-  "https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4";
-const VR_MODE_STORAGE_KEY = "vr_player_vr_mode";
-const STEREO_LAYOUT_STORAGE_KEY = "vr_player_stereo_layout";
-const FIT_THRESHOLD_STORAGE_KEY = "vr_player_fit_threshold";
+  'https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4';
+const VR_MODE_STORAGE_KEY = 'vr_player_vr_mode';
+const STEREO_LAYOUT_STORAGE_KEY = 'vr_player_stereo_layout';
+const FIT_THRESHOLD_STORAGE_KEY = 'vr_player_fit_threshold';
 const MIN_FIT_THRESHOLD = 0.05;
 const MAX_FIT_THRESHOLD = 0.5;
 const DEFAULT_FIT_THRESHOLD = 0.22;
@@ -181,25 +181,25 @@ const readStoredFitThreshold = (): number => {
 };
 
 const isStereoLayout = (value: string): value is StereoLayout =>
-  value === "mono" || value === "left-right" || value === "top-bottom";
+  value === 'mono' || value === 'left-right' || value === 'top-bottom';
 
 const readStoredStereoLayout = (): StereoLayout => {
   try {
     const stored = window.localStorage.getItem(STEREO_LAYOUT_STORAGE_KEY);
     if (!stored || !isStereoLayout(stored)) {
-      return "mono";
+      return 'mono';
     }
 
     return stored;
   } catch {
-    return "mono";
+    return 'mono';
   }
 };
 
 const readStoredVrModeEnabled = (): boolean => {
   try {
     const stored = window.localStorage.getItem(VR_MODE_STORAGE_KEY);
-    return stored === "true" || stored === "1";
+    return stored === 'true' || stored === '1';
   } catch {
     return false;
   }
@@ -219,11 +219,11 @@ const Main: React.FC = () => {
   const activeImageTextureSetRef = React.useRef<TextureSet | null>(null);
   const textureLoaderRef = React.useRef<THREE.TextureLoader | null>(null);
 
-  const stereoLayoutRef = React.useRef<StereoLayout>("mono");
+  const stereoLayoutRef = React.useRef<StereoLayout>('mono');
   const swapEyesRef = React.useRef<boolean>(false);
   const vrModeEnabledRef = React.useRef<boolean>(false);
   const fitMismatchThresholdRef = React.useRef<number>(DEFAULT_FIT_THRESHOLD);
-  const projectionModeRef = React.useRef<ProjectionMode>("360");
+  const projectionModeRef = React.useRef<ProjectionMode>('360');
   const loadedMediaRef = React.useRef<LoadedMedia>(null);
 
   const applyTextureSetRef = React.useRef<(set: TextureSet) => void>(
@@ -241,10 +241,10 @@ const Main: React.FC = () => {
   const updateFlatMeshSizeRef = React.useRef<() => void>(() => undefined);
 
   const [sourceUrl, setSourceUrl] = React.useState<string>(DEFAULT_SOURCE);
-  const [mediaHint, setMediaHint] = React.useState<MediaHint>("auto");
+  const [mediaHint, setMediaHint] = React.useState<MediaHint>('auto');
   const [loadedMedia, setLoadedMediaState] = React.useState<LoadedMedia>(null);
   const [projectionMode, setProjectionMode] =
-    React.useState<ProjectionMode>("360");
+    React.useState<ProjectionMode>('360');
   const [stereoLayout, setStereoLayout] = React.useState<StereoLayout>(
     readStoredStereoLayout,
   );
@@ -255,7 +255,7 @@ const Main: React.FC = () => {
     React.useState<number>(readStoredFitThreshold);
   const [swapEyes, setSwapEyes] = React.useState<boolean>(false);
   const [status, setStatus] = React.useState<string>(
-    "Scene ready. Load media and press Play.",
+    'Scene ready. Load media and press Play.',
   );
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
   const [isMuted, setIsMuted] = React.useState<boolean>(false);
@@ -321,10 +321,10 @@ const Main: React.FC = () => {
       setIsFullscreen(document.fullscreenElement === playerShellRef.current);
     };
 
-    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
 
     return () => {
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
     };
   }, []);
 
@@ -343,7 +343,7 @@ const Main: React.FC = () => {
 
     const scene = new THREE.Scene();
     const textureLoader = new THREE.TextureLoader();
-    textureLoader.setCrossOrigin("anonymous");
+    textureLoader.setCrossOrigin('anonymous');
     textureLoaderRef.current = textureLoader;
 
     const camera = new THREE.PerspectiveCamera(
@@ -358,11 +358,11 @@ const Main: React.FC = () => {
     const leftGeometry = createProjectionGeometry(projectionModeRef.current);
     const rightGeometry = createProjectionGeometry(projectionModeRef.current);
 
-    const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
     video.loop = true;
     video.playsInline = true;
-    video.preload = "auto";
+    video.preload = 'auto';
     videoRef.current = video;
 
     const texture = new THREE.VideoTexture(video);
@@ -480,8 +480,8 @@ const Main: React.FC = () => {
 
       const usingStereoVideo =
         renderer.xr.isPresenting &&
-        loadedMediaRef.current === "video" &&
-        stereoLayoutRef.current !== "mono";
+        loadedMediaRef.current === 'video' &&
+        stereoLayoutRef.current !== 'mono';
 
       flatMesh.visible = false;
       monoMesh.visible = !usingStereoVideo;
@@ -561,20 +561,20 @@ const Main: React.FC = () => {
       isPointerDown = false;
     };
 
-    renderer.domElement.addEventListener("pointerdown", onPointerDown);
-    renderer.domElement.addEventListener("pointermove", onPointerMove);
-    renderer.domElement.addEventListener("pointerup", onPointerUp);
-    renderer.domElement.addEventListener("pointerleave", onPointerUp);
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+    renderer.domElement.addEventListener('pointerleave', onPointerUp);
 
     const onVideoPlay = (): void => setIsPlaying(true);
     const onVideoPause = (): void => setIsPlaying(false);
     const onVideoEnded = (): void => setIsPlaying(false);
     const onVideoCanPlay = (): void => {
-      setLoadedMedia("video");
-      setStatus("Video loaded. Use Enter VR to watch in headset.");
+      setLoadedMedia('video');
+      setStatus('Video loaded. Use Enter VR to watch in headset.');
     };
     const onVideoError = (): void =>
-      setStatus("Unable to load media. Try another URL or local file.");
+      setStatus('Unable to load media. Try another URL or local file.');
     const onVideoLoadedMetadata = (): void => {
       setTimelineDuration(Number.isFinite(video.duration) ? video.duration : 0);
       setTimelineCurrent(video.currentTime || 0);
@@ -606,16 +606,16 @@ const Main: React.FC = () => {
       }
     };
 
-    video.addEventListener("play", onVideoPlay);
-    video.addEventListener("pause", onVideoPause);
-    video.addEventListener("ended", onVideoEnded);
-    video.addEventListener("canplay", onVideoCanPlay);
-    video.addEventListener("error", onVideoError);
-    video.addEventListener("loadedmetadata", onVideoLoadedMetadata);
-    video.addEventListener("timeupdate", onVideoTimeUpdate);
-    video.addEventListener("emptied", onVideoEmptied);
-    renderer.xr.addEventListener("sessionstart", setMeshVisibility);
-    renderer.xr.addEventListener("sessionend", setMeshVisibility);
+    video.addEventListener('play', onVideoPlay);
+    video.addEventListener('pause', onVideoPause);
+    video.addEventListener('ended', onVideoEnded);
+    video.addEventListener('canplay', onVideoCanPlay);
+    video.addEventListener('error', onVideoError);
+    video.addEventListener('loadedmetadata', onVideoLoadedMetadata);
+    video.addEventListener('timeupdate', onVideoTimeUpdate);
+    video.addEventListener('emptied', onVideoEmptied);
+    renderer.xr.addEventListener('sessionstart', setMeshVisibility);
+    renderer.xr.addEventListener('sessionend', setMeshVisibility);
 
     updateVrModeRef.current = (enabled: boolean): void => {
       vrModeEnabledRef.current = enabled;
@@ -633,27 +633,27 @@ const Main: React.FC = () => {
     const xrNav = navigator as XRNavigator;
     if (xrNav.xr) {
       xrNav.xr
-        .isSessionSupported("immersive-vr")
+        .isSessionSupported('immersive-vr')
         .then((supported) => {
           setXrSupported(supported);
           if (supported) {
             const createdVrButton = VRButton.createButton(renderer);
-            createdVrButton.classList.add("vr-enter-button");
+            createdVrButton.classList.add('vr-enter-button');
             vrButton = createdVrButton;
             syncVrUi();
           } else {
             setStatus(
-              "VR headset session not available. Desktop preview is still active.",
+              'VR headset session not available. Desktop preview is still active.',
             );
           }
         })
         .catch(() => {
           setXrSupported(false);
-          setStatus("WebXR check failed. Desktop preview is still active.");
+          setStatus('WebXR check failed. Desktop preview is still active.');
         });
     } else {
       setXrSupported(false);
-      setStatus("WebXR is not available in this browser.");
+      setStatus('WebXR is not available in this browser.');
     }
 
     const onResize = (): void => {
@@ -671,9 +671,9 @@ const Main: React.FC = () => {
       updateFlatMeshSize();
     };
 
-    window.addEventListener("resize", onResize);
+    window.addEventListener('resize', onResize);
 
-    setLoadedMedia("video");
+    setLoadedMedia('video');
     updateFlatMeshSize();
     syncVrUi();
     setMeshVisibility();
@@ -699,23 +699,23 @@ const Main: React.FC = () => {
 
     return () => {
       renderer.setAnimationLoop(null);
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener('resize', onResize);
 
-      video.removeEventListener("play", onVideoPlay);
-      video.removeEventListener("pause", onVideoPause);
-      video.removeEventListener("ended", onVideoEnded);
-      video.removeEventListener("canplay", onVideoCanPlay);
-      video.removeEventListener("error", onVideoError);
-      video.removeEventListener("loadedmetadata", onVideoLoadedMetadata);
-      video.removeEventListener("timeupdate", onVideoTimeUpdate);
-      video.removeEventListener("emptied", onVideoEmptied);
-      renderer.xr.removeEventListener("sessionstart", setMeshVisibility);
-      renderer.xr.removeEventListener("sessionend", setMeshVisibility);
+      video.removeEventListener('play', onVideoPlay);
+      video.removeEventListener('pause', onVideoPause);
+      video.removeEventListener('ended', onVideoEnded);
+      video.removeEventListener('canplay', onVideoCanPlay);
+      video.removeEventListener('error', onVideoError);
+      video.removeEventListener('loadedmetadata', onVideoLoadedMetadata);
+      video.removeEventListener('timeupdate', onVideoTimeUpdate);
+      video.removeEventListener('emptied', onVideoEmptied);
+      renderer.xr.removeEventListener('sessionstart', setMeshVisibility);
+      renderer.xr.removeEventListener('sessionend', setMeshVisibility);
 
-      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
-      renderer.domElement.removeEventListener("pointermove", onPointerMove);
-      renderer.domElement.removeEventListener("pointerup", onPointerUp);
-      renderer.domElement.removeEventListener("pointerleave", onPointerUp);
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointermove', onPointerMove);
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
+      renderer.domElement.removeEventListener('pointerleave', onPointerUp);
 
       if (vrButton && mountEl.contains(vrButton)) {
         mountEl.removeChild(vrButton);
@@ -749,7 +749,7 @@ const Main: React.FC = () => {
       renderer.dispose();
 
       video.pause();
-      video.removeAttribute("src");
+      video.removeAttribute('src');
       video.load();
       videoRef.current = null;
       textureLoaderRef.current = null;
@@ -779,7 +779,7 @@ const Main: React.FC = () => {
     }
 
     applyTextureSetRef.current(videoSet);
-    setLoadedMedia("video");
+    setLoadedMedia('video');
 
     video.pause();
     video.srcObject = null;
@@ -829,14 +829,14 @@ const Main: React.FC = () => {
       const video = videoRef.current;
       if (video) {
         video.pause();
-        video.removeAttribute("src");
+        video.removeAttribute('src');
         video.load();
       }
 
       setIsPlaying(false);
       setTimelineCurrent(0);
       setTimelineDuration(0);
-      setLoadedMedia("image");
+      setLoadedMedia('image');
       setStatus(
         `${label} image loaded. You can enter VR to view the panorama.`,
       );
@@ -850,7 +850,7 @@ const Main: React.FC = () => {
   const loadFromUrl = async (): Promise<void> => {
     const url = sourceUrl.trim();
     if (!url) {
-      setStatus("Enter a media URL first.");
+      setStatus('Enter a media URL first.');
       return;
     }
 
@@ -862,12 +862,12 @@ const Main: React.FC = () => {
       cleanupObjectUrlRef.current = null;
     }
 
-    if (type === "image") {
-      await setImageSource(url, requestToken, "URL");
+    if (type === 'image') {
+      await setImageSource(url, requestToken, 'URL');
       return;
     }
 
-    setVideoSource(url, "URL");
+    setVideoSource(url, 'URL');
   };
 
   React.useEffect(() => {
@@ -879,12 +879,12 @@ const Main: React.FC = () => {
       setSourceUrl(fileUrl);
 
       const requestToken = ++loadTokenRef.current;
-      if (inferMediaType(fileUrl, "auto") === "image") {
-        void setImageSource(fileUrl, requestToken, "Desktop menu");
+      if (inferMediaType(fileUrl, 'auto') === 'image') {
+        void setImageSource(fileUrl, requestToken, 'Desktop menu');
         return;
       }
 
-      setVideoSource(fileUrl, "Desktop menu");
+      setVideoSource(fileUrl, 'Desktop menu');
     });
 
     const disposeUrlListener = window.electronAPI.onMenuOpenUrl(() => {
@@ -906,12 +906,12 @@ const Main: React.FC = () => {
         setSourceUrl(nextUrl);
 
         const requestToken = ++loadTokenRef.current;
-        if (inferMediaType(nextUrl, mediaHint) === "image") {
-          void setImageSource(nextUrl, requestToken, "Desktop menu");
+        if (inferMediaType(nextUrl, mediaHint) === 'image') {
+          void setImageSource(nextUrl, requestToken, 'Desktop menu');
           return;
         }
 
-        setVideoSource(nextUrl, "Desktop menu");
+        setVideoSource(nextUrl, 'Desktop menu');
       })();
     });
 
@@ -930,10 +930,10 @@ const Main: React.FC = () => {
       return;
     }
 
-    const inferredHint: MediaHint = file.type.startsWith("image/")
-      ? "image"
-      : file.type.startsWith("video/")
-        ? "video"
+    const inferredHint: MediaHint = file.type.startsWith('image/')
+      ? 'image'
+      : file.type.startsWith('video/')
+        ? 'video'
         : mediaHint;
 
     if (cleanupObjectUrlRef.current) {
@@ -945,7 +945,7 @@ const Main: React.FC = () => {
     cleanupObjectUrlRef.current = objectUrl;
     const requestToken = ++loadTokenRef.current;
 
-    if (inferMediaType(file.name, inferredHint) === "image") {
+    if (inferMediaType(file.name, inferredHint) === 'image') {
       await setImageSource(objectUrl, requestToken, `local ${file.name}`);
       return;
     }
@@ -955,25 +955,25 @@ const Main: React.FC = () => {
 
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current;
-    if (!video || loadedMedia !== "video") {
-      setStatus("Playback controls are available only for video media.");
+    if (!video || loadedMedia !== 'video') {
+      setStatus('Playback controls are available only for video media.');
       return;
     }
 
     if (video.paused) {
       try {
         await video.play();
-        setStatus("Playing media.");
+        setStatus('Playing media.');
       } catch {
         setStatus(
-          "Playback blocked by browser. Click Play again after interaction.",
+          'Playback blocked by browser. Click Play again after interaction.',
         );
       }
       return;
     }
 
     video.pause();
-    setStatus("Paused.");
+    setStatus('Paused.');
   };
 
   const toggleMute = (): void => {
@@ -1007,7 +1007,7 @@ const Main: React.FC = () => {
     setTimelineCurrent(next);
 
     const video = videoRef.current;
-    if (!video || loadedMedia !== "video") {
+    if (!video || loadedMedia !== 'video') {
       return;
     }
 
@@ -1029,13 +1029,13 @@ const Main: React.FC = () => {
 
       await playerShell.requestFullscreen();
     } catch {
-      setStatus("Fullscreen action was blocked by the browser.");
+      setStatus('Fullscreen action was blocked by the browser.');
     }
   };
 
   const seekBySeconds = React.useCallback((deltaSeconds: number): void => {
     const video = videoRef.current;
-    if (!video || loadedMediaRef.current !== "video") {
+    if (!video || loadedMediaRef.current !== 'video') {
       return;
     }
 
@@ -1053,7 +1053,7 @@ const Main: React.FC = () => {
 
   const adjustVolumeByStep = React.useCallback((delta: number): void => {
     const video = videoRef.current;
-    if (!video || loadedMediaRef.current !== "video") {
+    if (!video || loadedMediaRef.current !== 'video') {
       return;
     }
 
@@ -1082,10 +1082,10 @@ const Main: React.FC = () => {
       if (target) {
         const tag = target.tagName;
         const isTextEntryTarget =
-          tag === "INPUT" ||
-          tag === "TEXTAREA" ||
-          tag === "SELECT" ||
-          tag === "BUTTON" ||
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          tag === 'BUTTON' ||
           target.isContentEditable;
 
         if (isTextEntryTarget) {
@@ -1093,39 +1093,39 @@ const Main: React.FC = () => {
         }
       }
 
-      if (event.code === "Space") {
+      if (event.code === 'Space') {
         event.preventDefault();
         void togglePlayback();
         return;
       }
 
-      if (event.key === "ArrowLeft") {
+      if (event.key === 'ArrowLeft') {
         event.preventDefault();
         seekBySeconds(-KEYBOARD_SEEK_STEP_SECONDS);
         return;
       }
 
-      if (event.key === "ArrowRight") {
+      if (event.key === 'ArrowRight') {
         event.preventDefault();
         seekBySeconds(KEYBOARD_SEEK_STEP_SECONDS);
         return;
       }
 
-      if (event.key === "ArrowUp") {
+      if (event.key === 'ArrowUp') {
         event.preventDefault();
         adjustVolumeByStep(KEYBOARD_VOLUME_STEP);
         return;
       }
 
-      if (event.key === "ArrowDown") {
+      if (event.key === 'ArrowDown') {
         event.preventDefault();
         adjustVolumeByStep(-KEYBOARD_VOLUME_STEP);
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [adjustVolumeByStep, seekBySeconds, togglePlayback]);
 
@@ -1136,6 +1136,7 @@ const Main: React.FC = () => {
         <PlayerViewer
           shellRef={playerShellRef}
           mountRef={mountRef}
+          isFullscreen={isFullscreen}
           controls={
             <PlayerControls
               insidePlayer
