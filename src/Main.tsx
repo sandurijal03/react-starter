@@ -1626,11 +1626,7 @@ const Main: React.FC = () => {
   return (
     <>
       <GlobalStyle />
-      <PlayerRoot
-        $immersive={isImmersive}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-      >
+      <PlayerRoot onDragOver={handleDragOver} onDrop={handleDrop}>
         <PlayerViewer
           shellRef={playerShellRef}
           mountRef={mountRef}

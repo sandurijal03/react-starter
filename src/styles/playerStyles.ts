@@ -47,18 +47,13 @@ export const GlobalStyle = createGlobalStyle`
   }
 `;
 
-export const PlayerRoot = styled.main<{ $immersive?: boolean }>`
+export const PlayerRoot = styled.main`
   width: 100vw;
-  min-height: 100vh;
+  height: 100vh;
   margin: 0;
-  padding: ${({ $immersive }) => ($immersive ? '0' : '0.65rem')};
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.5rem;
-
-  @media (max-width: ${MOBILE_BREAKPOINT}) {
-    padding: ${({ $immersive }) => ($immersive ? '0' : '0.35rem')};
-  }
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 `;
 
 export const HeroPanel = styled.section`
@@ -638,6 +633,17 @@ export const StatusText = styled.p`
   margin: 0.22rem 0 0;
   font-size: 0.74rem;
   color: #dde1e7;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+`;
+
+export const StatusMeta = styled.span`
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 0.92em;
+  white-space: nowrap;
 `;
 
 export const StatusSubtle = styled.p`
@@ -650,21 +656,18 @@ export const ViewerPanel = styled.section<{
   $isFullscreen?: boolean;
   $hideCursor?: boolean;
 }>`
-  ${panelSurface}
   position: relative;
-  padding: ${({ $isFullscreen }) => ($isFullscreen ? '0' : '0.38rem')};
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #000;
   overflow: hidden;
   ${({ $hideCursor }) => ($hideCursor ? 'cursor: none;' : '')}
-
-  ${({ $isFullscreen }) =>
-    $isFullscreen
-      ? `
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    background: #000;
-  `
-      : ''}
 `;
 
 export const CaptionOverlay = styled.div`
@@ -736,13 +739,11 @@ export const ViewerControlsWrap = styled.div<{
 
 export const ViewerCanvas = styled.div<{ $isFullscreen?: boolean }>`
   width: 100%;
-  height: ${({ $isFullscreen }) =>
-    $isFullscreen ? '100vh' : 'clamp(400px, calc(100vh - 220px), 980px)'};
-  border-radius: ${({ $isFullscreen }) => ($isFullscreen ? '0' : '6px')};
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   background: #000;
-  border: ${({ $isFullscreen }) =>
-    $isFullscreen ? '0' : '1px solid rgba(255, 255, 255, 0.12)'};
+  border: 0;
   position: relative;
 
   canvas {

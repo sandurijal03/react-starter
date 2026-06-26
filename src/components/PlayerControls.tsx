@@ -22,7 +22,7 @@ import {
   PopoverText,
   PopoverTitle,
   SeekTooltip,
-  StatusSubtle,
+  StatusMeta,
   StatusText,
   StyledSelect,
   TimelineRow,
@@ -664,12 +664,6 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         </ToolbarGroup>
       </CompactToolbar>
 
-      {!showSourceInputs ? (
-        <StatusSubtle>
-          Use File menu for Open File and Open Media URL.
-        </StatusSubtle>
-      ) : null}
-
       <TimelineRow>
         <label htmlFor="timeline-slider">Timeline</label>
         <TimelineSliderWrap
@@ -695,11 +689,13 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         <TimelineText>{timelineLabel}</TimelineText>
       </TimelineRow>
 
-      <StatusText>{status}</StatusText>
-      <StatusSubtle>
-        {loadedMedia ?? "none"} · WebXR{" "}
-        {xrSupported === null ? "checking…" : xrSupported ? "yes" : "no"}
-      </StatusSubtle>
+      <StatusText>
+        {status}
+        <StatusMeta>
+          {loadedMedia ?? "none"} · WebXR{" "}
+          {xrSupported === null ? "…" : xrSupported ? "yes" : "no"}
+        </StatusMeta>
+      </StatusText>
     </ControlsPanel>
   );
 };
