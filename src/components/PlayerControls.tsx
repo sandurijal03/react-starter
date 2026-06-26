@@ -14,6 +14,10 @@ import {
   MenuPopoverPanel,
   MenuToggle,
   MiniButton,
+  PopoverDivider,
+  PopoverEmpty,
+  PopoverList,
+  PopoverListButton,
   PopoverRow,
   PopoverText,
   PopoverTitle,
@@ -30,6 +34,7 @@ import {
 import {
   MediaHint,
   LoadedMedia,
+  PlaylistItem,
   ProjectionMode,
   StereoLayout,
 } from "../types/player";
@@ -49,6 +54,13 @@ type PlayerControlsProps = {
   isMuted: boolean;
   isFullscreen: boolean;
   volume: number;
+  playbackRate: number;
+  playbackRateOptions: number[];
+  playlist: PlaylistItem[];
+  currentIndex: number;
+  canPlayPrevious: boolean;
+  canPlayNext: boolean;
+  recentItems: PlaylistItem[];
   timelineCurrent: number;
   timelineDuration: number;
   timelineLabel: string;
@@ -68,6 +80,12 @@ type PlayerControlsProps = {
   onToggleFullscreen: () => void;
   onVolumeChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onSeekChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onPlaybackRateChange: (value: number) => void;
+  onPlayPrevious: () => void;
+  onPlayNext: () => void;
+  onSelectPlaylistItem: (id: string) => void;
+  onSelectRecentItem: (item: PlaylistItem) => void;
+  onClearRecents: () => void;
 };
 
 type ToolbarIconName =
@@ -80,7 +98,10 @@ type ToolbarIconName =
   | "mute"
   | "unmute"
   | "fullscreen"
-  | "exit-fullscreen";
+  | "exit-fullscreen"
+  | "previous"
+  | "next"
+  | "library";
 
 const ToolbarIcon: React.FC<{ name: ToolbarIconName }> = ({ name }) => {
   switch (name) {
@@ -157,6 +178,25 @@ const ToolbarIcon: React.FC<{ name: ToolbarIconName }> = ({ name }) => {
           <path d="M9 9h6v6H9z" />
         </svg>
       );
+    case "previous":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 5h2v14H7zm3 7l9 7V5z" />
+        </svg>
+      );
+    case "next":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M15 5h2v14h-2zM5 5l9 7-9 7z" />
+        </svg>
+      );
+    case "library":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 5h12v2H3zm0 4h12v2H3zm0 4h8v2H3z" />
+          <path d="M17 9l5 3.5-5 3.5z" />
+        </svg>
+      );
     case "play":
     default:
       return (
@@ -182,6 +222,13 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   isMuted,
   isFullscreen,
   volume,
+  playbackRate,
+  playbackRateOptions,
+  playlist,
+  currentIndex,
+  canPlayPrevious,
+  canPlayNext,
+  recentItems,
   timelineCurrent,
   timelineDuration,
   timelineLabel,
@@ -201,6 +248,12 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onToggleFullscreen,
   onVolumeChange,
   onSeekChange,
+  onPlaybackRateChange,
+  onPlayPrevious,
+  onPlayNext,
+  onSelectPlaylistItem,
+  onSelectRecentItem,
+  onClearRecents,
 }) => {
   return (
     <ControlsPanel $insidePlayer={insidePlayer}>
@@ -227,6 +280,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                 id="video-file"
                 type="file"
                 accept="video/*,image/*"
+                multiple
                 onChange={onLoadFile}
               />
               <MenuPopover>
@@ -261,6 +315,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
         <ToolbarGroup>
           <IconButton
             type="button"
+            onClick={onPlayPrevious}
+            disabled={!canPlayPrevious}
+            title="Previous"
+            aria-label="Previous"
+          >
+            <ToolbarIcon name="previous" />
+          </IconButton>
+          <IconButton
+            type="button"
             onClick={onTogglePlayback}
             disabled={loadedMedia !== "video"}
             title={isPlaying ? "Pause" : "Play"}
@@ -268,6 +331,15 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             $active={isPlaying}
           >
             <ToolbarIcon name={isPlaying ? "pause" : "play"} />
+          </IconButton>
+          <IconButton
+            type="button"
+            onClick={onPlayNext}
+            disabled={!canPlayNext}
+            title="Next"
+            aria-label="Next"
+          >
+            <ToolbarIcon name="next" />
           </IconButton>
           <IconButton
             type="button"
@@ -299,6 +371,22 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             onChange={onVolumeChange}
             aria-label="Volume"
           />
+          <CompactSelect
+            id="playback-rate"
+            aria-label="Playback speed"
+            title="Playback speed"
+            value={String(playbackRate)}
+            disabled={loadedMedia !== "video"}
+            onChange={(event) =>
+              onPlaybackRateChange(Number(event.target.value))
+            }
+          >
+            {playbackRateOptions.map((rate) => (
+              <option key={rate} value={rate}>
+                {rate}&times;
+              </option>
+            ))}
+          </CompactSelect>
         </ToolbarGroup>
 
         <ToolbarGroup>
@@ -397,6 +485,65 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                   Swap Eyes
                 </MenuToggle>
               </PopoverRow>
+            </MenuPopoverPanel>
+          </MenuPopover>
+
+          <MenuPopover>
+            <MenuPopoverButton
+              aria-label="Open playlist and recent media"
+              title="Playlist & recent"
+              $active={playlist.length > 0}
+            >
+              <ToolbarIcon name="library" />
+            </MenuPopoverButton>
+            <MenuPopoverPanel>
+              <PopoverTitle>Playlist</PopoverTitle>
+              {playlist.length === 0 ? (
+                <PopoverEmpty>
+                  Queue is empty. Open or drop media to add.
+                </PopoverEmpty>
+              ) : (
+                <PopoverList>
+                  {playlist.map((item, index) => (
+                    <PopoverListButton
+                      key={item.id}
+                      type="button"
+                      $active={index === currentIndex}
+                      title={item.label}
+                      onClick={() => onSelectPlaylistItem(item.id)}
+                    >
+                      <span>{`${index + 1}. ${item.label}`}</span>
+                    </PopoverListButton>
+                  ))}
+                </PopoverList>
+              )}
+
+              <PopoverDivider />
+
+              <PopoverTitle>Recent</PopoverTitle>
+              {recentItems.length === 0 ? (
+                <PopoverEmpty>No recent media yet.</PopoverEmpty>
+              ) : (
+                <>
+                  <PopoverList>
+                    {recentItems.map((item) => (
+                      <PopoverListButton
+                        key={item.id}
+                        type="button"
+                        title={item.src}
+                        onClick={() => onSelectRecentItem(item)}
+                      >
+                        <span>{item.label}</span>
+                      </PopoverListButton>
+                    ))}
+                  </PopoverList>
+                  <PopoverRow>
+                    <MiniButton type="button" onClick={onClearRecents}>
+                      Clear recent
+                    </MiniButton>
+                  </PopoverRow>
+                </>
+              )}
             </MenuPopoverPanel>
           </MenuPopover>
         </ToolbarGroup>

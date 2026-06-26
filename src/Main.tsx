@@ -1,12 +1,14 @@
 import * as React from 'react';
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import Hls from 'hls.js';
 import PlayerControls from './components/PlayerControls';
 import { GlobalStyle, PlayerRoot } from './components/playerStyles';
 import PlayerViewer from './components/PlayerViewer';
 import {
   LoadedMedia,
   MediaHint,
+  PlaylistItem,
   ProjectionMode,
   StereoLayout,
 } from './types/player';
@@ -26,6 +28,13 @@ type TextureSet = {
 
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|bmp|gif)(\?.*)?$/i;
 const VIDEO_EXTENSIONS = /\.(mp4|webm|mov|m4v|ogv|m3u8)(\?.*)?$/i;
+const HLS_EXTENSIONS = /\.m3u8(\?.*)?$/i;
+const PERSISTABLE_SOURCE = /^(https?|file):/i;
+
+const RECENT_STORAGE_KEY = 'vr_player_recent_media';
+const MAX_RECENT_ITEMS = 12;
+const PLAYBACK_RATE_OPTIONS = [0.5, 1, 1.5, 2];
+const DEFAULT_PLAYBACK_RATE = 1;
 
 const formatTime = (seconds: number): string => {
   const pad2 = (value: number): string =>
@@ -205,14 +214,59 @@ const readStoredVrModeEnabled = (): boolean => {
   }
 };
 
+const isMediaHint = (value: unknown): value is MediaHint =>
+  value === 'auto' || value === 'video' || value === 'image';
+
+const readStoredRecentItems = (): PlaylistItem[] => {
+  try {
+    const stored = window.localStorage.getItem(RECENT_STORAGE_KEY);
+    if (!stored) {
+      return [];
+    }
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter(
+        (entry): entry is { src: string; label: string; hint: MediaHint } =>
+          Boolean(entry) &&
+          typeof entry === 'object' &&
+          typeof (entry as { src?: unknown }).src === 'string' &&
+          typeof (entry as { label?: unknown }).label === 'string' &&
+          isMediaHint((entry as { hint?: unknown }).hint),
+      )
+      .slice(0, MAX_RECENT_ITEMS)
+      .map((entry, index) => ({
+        id: `recent-${index}-${entry.src}`,
+        src: entry.src,
+        label: entry.label,
+        hint: entry.hint,
+        persistable: true,
+      }));
+  } catch {
+    return [];
+  }
+};
+
 const Main: React.FC = () => {
   const isDesktopApp = Boolean(window.electronAPI?.isDesktop);
 
   const mountRef = React.useRef<HTMLDivElement | null>(null);
   const playerShellRef = React.useRef<HTMLElement | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
-  const cleanupObjectUrlRef = React.useRef<string | null>(null);
   const loadTokenRef = React.useRef<number>(0);
+  const hlsRef = React.useRef<Hls | null>(null);
+  // Object URLs created for dropped/picked local files. Kept alive for the
+  // whole session so playlist navigation can revisit them, then revoked on
+  // unmount.
+  const objectUrlsRef = React.useRef<Set<string>>(new Set());
+  const idCounterRef = React.useRef<number>(0);
+  const playlistRef = React.useRef<PlaylistItem[]>([]);
+  const currentIndexRef = React.useRef<number>(-1);
+  const playbackRateRef = React.useRef<number>(DEFAULT_PLAYBACK_RATE);
 
   const currentTextureSetRef = React.useRef<TextureSet | null>(null);
   const videoTextureSetRef = React.useRef<TextureSet | null>(null);
@@ -268,6 +322,14 @@ const Main: React.FC = () => {
     React.useState<boolean>(false);
   const [isWindowMaximized, setIsWindowMaximized] =
     React.useState<boolean>(false);
+  const [playbackRate, setPlaybackRate] = React.useState<number>(
+    DEFAULT_PLAYBACK_RATE,
+  );
+  const [playlist, setPlaylist] = React.useState<PlaylistItem[]>([]);
+  const [currentIndex, setCurrentIndex] = React.useState<number>(-1);
+  const [recentItems, setRecentItems] = React.useState<PlaylistItem[]>(
+    readStoredRecentItems,
+  );
 
   const setLoadedMedia = React.useCallback((value: LoadedMedia): void => {
     loadedMediaRef.current = value;
@@ -319,6 +381,14 @@ const Main: React.FC = () => {
 
     updateFlatMeshSizeRef.current();
   }, [fitMismatchThreshold]);
+
+  React.useEffect(() => {
+    playbackRateRef.current = playbackRate;
+    const video = videoRef.current;
+    if (video) {
+      video.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
 
   React.useEffect(() => {
     const detectFullscreen = (): void => {
@@ -636,6 +706,7 @@ const Main: React.FC = () => {
     const onVideoError = (): void =>
       setStatus('Unable to load media. Try another URL or local file.');
     const onVideoLoadedMetadata = (): void => {
+      video.playbackRate = playbackRateRef.current;
       setTimelineDuration(Number.isFinite(video.duration) ? video.duration : 0);
       setTimelineCurrent(video.currentTime || 0);
       updateFlatMeshSize();
@@ -781,10 +852,15 @@ const Main: React.FC = () => {
         mountEl.removeChild(vrButton);
       }
 
-      if (cleanupObjectUrlRef.current) {
-        URL.revokeObjectURL(cleanupObjectUrlRef.current);
-        cleanupObjectUrlRef.current = null;
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
+
+      for (const objectUrl of objectUrlsRef.current) {
+        URL.revokeObjectURL(objectUrl);
+      }
+      objectUrlsRef.current.clear();
 
       if (activeImageTextureSetRef.current) {
         disposeTextureSet(activeImageTextureSetRef.current);
@@ -826,109 +902,268 @@ const Main: React.FC = () => {
     };
   }, [setLoadedMedia]);
 
-  const setVideoSource = (source: string, label: string): void => {
-    const video = videoRef.current;
-    const videoSet = videoTextureSetRef.current;
-    if (!video || !videoSet) {
-      return;
+  const teardownHls = React.useCallback((): void => {
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
     }
+  }, []);
 
-    if (activeImageTextureSetRef.current) {
-      disposeTextureSet(activeImageTextureSetRef.current);
-      activeImageTextureSetRef.current = null;
-    }
-
-    applyTextureSetRef.current(videoSet);
-    setLoadedMedia('video');
-
-    video.pause();
-    video.srcObject = null;
-    video.src = source;
-    video.load();
-
-    setTimelineCurrent(0);
-    setTimelineDuration(0);
-    setStatus(`Loading ${label} video...`);
-  };
-
-  const setImageSource = async (
-    source: string,
-    requestToken: number,
-    label: string,
-  ): Promise<void> => {
-    const loader = textureLoaderRef.current;
-    if (!loader) {
-      return;
-    }
-
-    setStatus(`Loading ${label} image...`);
-
-    try {
-      const baseTexture = await loader.loadAsync(source);
-      baseTexture.colorSpace = THREE.SRGBColorSpace;
-
-      const imageTextureSet = createTextureSet(baseTexture, false);
-      applyStereoLayoutToTextureSet(
-        stereoLayoutRef.current,
-        imageTextureSet,
-        swapEyesRef.current,
-      );
-
-      if (requestToken !== loadTokenRef.current) {
-        disposeTextureSet(imageTextureSet);
+  const setVideoSource = React.useCallback(
+    (source: string, label: string): void => {
+      const video = videoRef.current;
+      const videoSet = videoTextureSetRef.current;
+      if (!video || !videoSet) {
         return;
       }
 
+      teardownHls();
+
       if (activeImageTextureSetRef.current) {
         disposeTextureSet(activeImageTextureSetRef.current);
+        activeImageTextureSetRef.current = null;
       }
 
-      activeImageTextureSetRef.current = imageTextureSet;
-      applyTextureSetRef.current(imageTextureSet);
+      applyTextureSetRef.current(videoSet);
+      setLoadedMedia('video');
 
-      const video = videoRef.current;
-      if (video) {
-        video.pause();
+      video.pause();
+      video.srcObject = null;
+
+      const isHls = HLS_EXTENSIONS.test(source);
+      const canPlayNativeHls = Boolean(
+        video.canPlayType('application/vnd.apple.mpegurl'),
+      );
+
+      if (isHls && !canPlayNativeHls && Hls.isSupported()) {
+        // Chromium/Electron has no native HLS, so demux via hls.js.
         video.removeAttribute('src');
+        const hls = new Hls();
+        hlsRef.current = hls;
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) {
+            setStatus(`Unable to load ${label} stream (HLS error).`);
+          }
+        });
+        hls.loadSource(source);
+        hls.attachMedia(video);
+      } else {
+        video.removeAttribute('src');
+        video.src = source;
         video.load();
       }
 
-      setIsPlaying(false);
+      video.playbackRate = playbackRateRef.current;
+
       setTimelineCurrent(0);
       setTimelineDuration(0);
-      setLoadedMedia('image');
-      setStatus(
-        `${label} image loaded. You can enter VR to view the panorama.`,
-      );
-    } catch {
-      if (requestToken === loadTokenRef.current) {
-        setStatus(`Unable to load ${label} image.`);
-      }
-    }
-  };
+      setStatus(`Loading ${label} video...`);
+    },
+    [setLoadedMedia, teardownHls],
+  );
 
-  const loadFromUrl = async (): Promise<void> => {
+  const setImageSource = React.useCallback(
+    async (
+      source: string,
+      requestToken: number,
+      label: string,
+    ): Promise<void> => {
+      const loader = textureLoaderRef.current;
+      if (!loader) {
+        return;
+      }
+
+      setStatus(`Loading ${label} image...`);
+
+      try {
+        const baseTexture = await loader.loadAsync(source);
+        baseTexture.colorSpace = THREE.SRGBColorSpace;
+
+        const imageTextureSet = createTextureSet(baseTexture, false);
+        applyStereoLayoutToTextureSet(
+          stereoLayoutRef.current,
+          imageTextureSet,
+          swapEyesRef.current,
+        );
+
+        if (requestToken !== loadTokenRef.current) {
+          disposeTextureSet(imageTextureSet);
+          return;
+        }
+
+        teardownHls();
+
+        if (activeImageTextureSetRef.current) {
+          disposeTextureSet(activeImageTextureSetRef.current);
+        }
+
+        activeImageTextureSetRef.current = imageTextureSet;
+        applyTextureSetRef.current(imageTextureSet);
+
+        const video = videoRef.current;
+        if (video) {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        }
+
+        setIsPlaying(false);
+        setTimelineCurrent(0);
+        setTimelineDuration(0);
+        setLoadedMedia('image');
+        setStatus(
+          `${label} image loaded. You can enter VR to view the panorama.`,
+        );
+      } catch {
+        if (requestToken === loadTokenRef.current) {
+          setStatus(`Unable to load ${label} image.`);
+        }
+      }
+    },
+    [setLoadedMedia, teardownHls],
+  );
+
+  const nextItemId = React.useCallback((): string => {
+    idCounterRef.current += 1;
+    return `item-${idCounterRef.current}`;
+  }, []);
+
+  const buildItem = React.useCallback(
+    (src: string, label: string, hint: MediaHint): PlaylistItem => ({
+      id: nextItemId(),
+      src,
+      label,
+      hint,
+      persistable: PERSISTABLE_SOURCE.test(src),
+    }),
+    [nextItemId],
+  );
+
+  const buildItemFromFile = React.useCallback(
+    (file: File): PlaylistItem => {
+      const hint: MediaHint = file.type.startsWith('image/')
+        ? 'image'
+        : file.type.startsWith('video/')
+          ? 'video'
+          : mediaHint;
+      const objectUrl = URL.createObjectURL(file);
+      objectUrlsRef.current.add(objectUrl);
+
+      return {
+        id: nextItemId(),
+        src: objectUrl,
+        label: file.name,
+        hint,
+        persistable: false,
+      };
+    },
+    [mediaHint, nextItemId],
+  );
+
+  const addToRecents = React.useCallback((items: PlaylistItem[]): void => {
+    const persistable = items.filter((item) => item.persistable);
+    if (persistable.length === 0) {
+      return;
+    }
+
+    setRecentItems((previous) => {
+      const merged = [...persistable, ...previous];
+      const seen = new Set<string>();
+      const deduped: PlaylistItem[] = [];
+
+      for (const item of merged) {
+        if (seen.has(item.src)) {
+          continue;
+        }
+
+        seen.add(item.src);
+        deduped.push(item);
+        if (deduped.length >= MAX_RECENT_ITEMS) {
+          break;
+        }
+      }
+
+      try {
+        window.localStorage.setItem(
+          RECENT_STORAGE_KEY,
+          JSON.stringify(
+            deduped.map(({ src, label, hint }) => ({ src, label, hint })),
+          ),
+        );
+      } catch {
+        // Ignore persistence errors (private mode / blocked storage).
+      }
+
+      return deduped;
+    });
+  }, []);
+
+  const loadItemMedia = React.useCallback(
+    (item: PlaylistItem): void => {
+      const requestToken = ++loadTokenRef.current;
+      if (item.persistable) {
+        setSourceUrl(item.src);
+      }
+
+      if (inferMediaType(item.src, item.hint) === 'image') {
+        void setImageSource(item.src, requestToken, item.label);
+        return;
+      }
+
+      setVideoSource(item.src, item.label);
+    },
+    [setImageSource, setVideoSource],
+  );
+
+  const goToIndex = React.useCallback(
+    (index: number): void => {
+      const list = playlistRef.current;
+      if (index < 0 || index >= list.length) {
+        return;
+      }
+
+      currentIndexRef.current = index;
+      setCurrentIndex(index);
+      loadItemMedia(list[index]);
+    },
+    [loadItemMedia],
+  );
+
+  const openItems = React.useCallback(
+    (items: PlaylistItem[], replace = false): void => {
+      if (items.length === 0) {
+        return;
+      }
+
+      const baseList = replace ? [] : playlistRef.current;
+      const nextList = [...baseList, ...items];
+      const startIndex = baseList.length;
+
+      playlistRef.current = nextList;
+      setPlaylist(nextList);
+      addToRecents(items);
+      goToIndex(startIndex);
+    },
+    [addToRecents, goToIndex],
+  );
+
+  const playNext = React.useCallback((): void => {
+    goToIndex(currentIndexRef.current + 1);
+  }, [goToIndex]);
+
+  const playPrevious = React.useCallback((): void => {
+    goToIndex(currentIndexRef.current - 1);
+  }, [goToIndex]);
+
+  const loadFromUrl = React.useCallback((): void => {
     const url = sourceUrl.trim();
     if (!url) {
       setStatus('Enter a media URL first.');
       return;
     }
 
-    const type = inferMediaType(url, mediaHint);
-    const requestToken = ++loadTokenRef.current;
-
-    if (cleanupObjectUrlRef.current) {
-      URL.revokeObjectURL(cleanupObjectUrlRef.current);
-      cleanupObjectUrlRef.current = null;
-    }
-
-    if (type === 'image') {
-      await setImageSource(url, requestToken, 'URL');
-      return;
-    }
-
-    setVideoSource(url, 'URL');
-  };
+    openItems([buildItem(url, url, mediaHint)]);
+  }, [buildItem, mediaHint, openItems, sourceUrl]);
 
   React.useEffect(() => {
     if (!isDesktopApp || !window.electronAPI) {
@@ -936,15 +1171,7 @@ const Main: React.FC = () => {
     }
 
     const disposeFileListener = window.electronAPI.onMenuOpenFile((fileUrl) => {
-      setSourceUrl(fileUrl);
-
-      const requestToken = ++loadTokenRef.current;
-      if (inferMediaType(fileUrl, 'auto') === 'image') {
-        void setImageSource(fileUrl, requestToken, 'Desktop menu');
-        return;
-      }
-
-      setVideoSource(fileUrl, 'Desktop menu');
+      openItems([buildItem(fileUrl, fileUrl, 'auto')]);
     });
 
     const disposeUrlListener = window.electronAPI.onMenuOpenUrl(() => {
@@ -963,15 +1190,7 @@ const Main: React.FC = () => {
           return;
         }
 
-        setSourceUrl(nextUrl);
-
-        const requestToken = ++loadTokenRef.current;
-        if (inferMediaType(nextUrl, mediaHint) === 'image') {
-          void setImageSource(nextUrl, requestToken, 'Desktop menu');
-          return;
-        }
-
-        setVideoSource(nextUrl, 'Desktop menu');
+        openItems([buildItem(nextUrl, nextUrl, mediaHint)]);
       })();
     });
 
@@ -979,39 +1198,75 @@ const Main: React.FC = () => {
       disposeFileListener();
       disposeUrlListener();
     };
-  }, [isDesktopApp, mediaHint, setImageSource, sourceUrl]);
+  }, [buildItem, isDesktopApp, mediaHint, openItems, sourceUrl]);
 
-  const loadFromFile = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ): Promise<void> => {
-    const file = event.target.files?.[0];
+  const loadFromFile = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
+      const files = Array.from(event.target.files ?? []);
+      if (files.length === 0) {
+        return;
+      }
 
-    if (!file) {
-      return;
+      openItems(files.map((file) => buildItemFromFile(file)));
+      // Allow re-selecting the same file(s) again later.
+      event.target.value = '';
+    },
+    [buildItemFromFile, openItems],
+  );
+
+  const handleDragOver = React.useCallback(
+    (event: React.DragEvent<HTMLElement>): void => {
+      event.preventDefault();
+    },
+    [],
+  );
+
+  const handleDrop = React.useCallback(
+    (event: React.DragEvent<HTMLElement>): void => {
+      event.preventDefault();
+
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (files.length > 0) {
+        openItems(files.map((file) => buildItemFromFile(file)));
+        return;
+      }
+
+      const text =
+        event.dataTransfer?.getData('text/uri-list') ||
+        event.dataTransfer?.getData('text/plain');
+      const url = text?.trim();
+      if (url) {
+        openItems([buildItem(url, url, mediaHint)]);
+      }
+    },
+    [buildItem, buildItemFromFile, mediaHint, openItems],
+  );
+
+  const selectPlaylistItem = React.useCallback(
+    (id: string): void => {
+      const index = playlistRef.current.findIndex((item) => item.id === id);
+      if (index >= 0) {
+        goToIndex(index);
+      }
+    },
+    [goToIndex],
+  );
+
+  const selectRecentItem = React.useCallback(
+    (item: PlaylistItem): void => {
+      openItems([buildItem(item.src, item.label, item.hint)]);
+    },
+    [buildItem, openItems],
+  );
+
+  const clearRecents = React.useCallback((): void => {
+    setRecentItems([]);
+    try {
+      window.localStorage.removeItem(RECENT_STORAGE_KEY);
+    } catch {
+      // Ignore persistence errors.
     }
-
-    const inferredHint: MediaHint = file.type.startsWith('image/')
-      ? 'image'
-      : file.type.startsWith('video/')
-        ? 'video'
-        : mediaHint;
-
-    if (cleanupObjectUrlRef.current) {
-      URL.revokeObjectURL(cleanupObjectUrlRef.current);
-      cleanupObjectUrlRef.current = null;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    cleanupObjectUrlRef.current = objectUrl;
-    const requestToken = ++loadTokenRef.current;
-
-    if (inferMediaType(file.name, inferredHint) === 'image') {
-      await setImageSource(objectUrl, requestToken, `local ${file.name}`);
-      return;
-    }
-
-    setVideoSource(objectUrl, `local ${file.name}`);
-  };
+  }, []);
 
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current;
@@ -1189,10 +1444,17 @@ const Main: React.FC = () => {
     };
   }, [adjustVolumeByStep, seekBySeconds, togglePlayback]);
 
+  const canPlayPrevious = currentIndex > 0;
+  const canPlayNext = currentIndex >= 0 && currentIndex < playlist.length - 1;
+
   return (
     <>
       <GlobalStyle />
-      <PlayerRoot $immersive={isImmersive}>
+      <PlayerRoot
+        $immersive={isImmersive}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
         <PlayerViewer
           shellRef={playerShellRef}
           mountRef={mountRef}
@@ -1213,6 +1475,13 @@ const Main: React.FC = () => {
               isMuted={isMuted}
               isFullscreen={isWindowedFullscreen}
               volume={volume}
+              playbackRate={playbackRate}
+              playbackRateOptions={PLAYBACK_RATE_OPTIONS}
+              playlist={playlist}
+              currentIndex={currentIndex}
+              canPlayPrevious={canPlayPrevious}
+              canPlayNext={canPlayNext}
+              recentItems={recentItems}
               timelineCurrent={timelineCurrent}
               timelineDuration={timelineDuration}
               timelineLabel={`${formatTime(timelineCurrent)} / ${formatTime(timelineDuration)}`}
@@ -1232,6 +1501,12 @@ const Main: React.FC = () => {
               onToggleFullscreen={() => void toggleFullscreen()}
               onVolumeChange={onVolumeChange}
               onSeekChange={onSeekChange}
+              onPlaybackRateChange={setPlaybackRate}
+              onPlayPrevious={playPrevious}
+              onPlayNext={playNext}
+              onSelectPlaylistItem={selectPlaylistItem}
+              onSelectRecentItem={selectRecentItem}
+              onClearRecents={clearRecents}
             />
           }
         />

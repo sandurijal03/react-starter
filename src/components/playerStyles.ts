@@ -288,6 +288,58 @@ export const PopoverText = styled.span`
   color: var(--ink-soft);
 `;
 
+export const PopoverList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  max-height: 240px;
+  overflow-y: auto;
+`;
+
+export const PopoverListButton = styled.button<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid
+    ${({ $active }) =>
+      $active ? 'rgba(255, 143, 0, 0.7)' : 'rgba(255, 255, 255, 0.1)'};
+  background: ${({ $active }) =>
+    $active ? 'rgba(255, 143, 0, 0.16)' : 'rgba(20, 23, 28, 0.85)'};
+  color: ${({ $active }) => ($active ? '#ffd7a3' : '#e7eaf0')};
+  border-radius: 6px;
+  padding: 0.36rem 0.46rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    border-color: rgba(255, 143, 0, 0.7);
+  }
+`;
+
+export const PopoverEmpty = styled.p`
+  margin: 0.1rem 0 0.3rem;
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+`;
+
+export const PopoverDivider = styled.hr`
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 0.5rem 0;
+`;
+
 export const MiniButton = styled.button`
   border: 1px solid rgba(255, 143, 0, 0.65);
   border-radius: 6px;
@@ -565,11 +617,15 @@ export const StatusSubtle = styled.p`
   color: var(--ink-soft);
 `;
 
-export const ViewerPanel = styled.section<{ $isFullscreen?: boolean }>`
+export const ViewerPanel = styled.section<{
+  $isFullscreen?: boolean;
+  $hideCursor?: boolean;
+}>`
   ${panelSurface}
   position: relative;
   padding: ${({ $isFullscreen }) => ($isFullscreen ? '0' : '0.38rem')};
   overflow: hidden;
+  ${({ $hideCursor }) => ($hideCursor ? 'cursor: none;' : '')}
 
   ${({ $isFullscreen }) =>
     $isFullscreen
