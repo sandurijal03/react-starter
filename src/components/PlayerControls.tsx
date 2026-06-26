@@ -60,6 +60,8 @@ type PlayerControlsProps = {
   playbackRate: number;
   playbackRateOptions: number[];
   isLooping: boolean;
+  subtitlesEnabled: boolean;
+  subtitleName: string;
   playlist: PlaylistItem[];
   currentIndex: number;
   canPlayPrevious: boolean;
@@ -87,6 +89,9 @@ type PlayerControlsProps = {
   onPlaybackRateChange: (value: number) => void;
   onLoopChange: (value: boolean) => void;
   onRecenter: () => void;
+  onLoadSubtitle: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onToggleSubtitles: () => void;
+  onClearSubtitles: () => void;
   onPlayPrevious: () => void;
   onPlayNext: () => void;
   onSelectPlaylistItem: (id: string) => void;
@@ -107,7 +112,8 @@ type ToolbarIconName =
   | "exit-fullscreen"
   | "previous"
   | "next"
-  | "library";
+  | "library"
+  | "captions";
 
 const ToolbarIcon: React.FC<{ name: ToolbarIconName }> = ({ name }) => {
   switch (name) {
@@ -203,6 +209,13 @@ const ToolbarIcon: React.FC<{ name: ToolbarIconName }> = ({ name }) => {
           <path d="M17 9l5 3.5-5 3.5z" />
         </svg>
       );
+    case "captions":
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 5h18v14H3zm0 0" fill="none" />
+          <path d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm3.2 5.1c0-.5.4-.8.9-.8.4 0 .7.2.9.5l1.3-.7c-.4-.8-1.2-1.3-2.2-1.3-1.5 0-2.7 1.1-2.7 2.9s1.2 2.9 2.7 2.9c1 0 1.8-.5 2.2-1.3l-1.3-.7c-.2.3-.5.5-.9.5-.5 0-.9-.4-.9-1zm6 0c0-.5.4-.8.9-.8.4 0 .7.2.9.5l1.3-.7c-.4-.8-1.2-1.3-2.2-1.3-1.5 0-2.7 1.1-2.7 2.9s1.2 2.9 2.7 2.9c1 0 1.8-.5 2.2-1.3l-1.3-.7c-.2.3-.5.5-.9.5-.5 0-.9-.4-.9-1z" />
+        </svg>
+      );
     case "play":
     default:
       return (
@@ -231,6 +244,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   playbackRate,
   playbackRateOptions,
   isLooping,
+  subtitlesEnabled,
+  subtitleName,
   playlist,
   currentIndex,
   canPlayPrevious,
@@ -258,6 +273,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onPlaybackRateChange,
   onLoopChange,
   onRecenter,
+  onLoadSubtitle,
+  onToggleSubtitles,
+  onClearSubtitles,
   onPlayPrevious,
   onPlayNext,
   onSelectPlaylistItem,
@@ -588,6 +606,53 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                   </PopoverRow>
                 </>
               )}
+            </MenuPopoverPanel>
+          </MenuPopover>
+
+          <MenuPopover>
+            <MenuPopoverButton
+              aria-label="Open subtitle controls"
+              title="Subtitles"
+              $active={subtitlesEnabled && Boolean(subtitleName)}
+            >
+              <ToolbarIcon name="captions" />
+            </MenuPopoverButton>
+            <MenuPopoverPanel>
+              <PopoverTitle>Subtitles</PopoverTitle>
+              <PopoverRow>
+                <IconFileLabel htmlFor="subtitle-file" title="Load .srt / .vtt">
+                  <ToolbarIcon name="file" />
+                </IconFileLabel>
+                <HiddenFileInput
+                  id="subtitle-file"
+                  type="file"
+                  accept=".srt,.vtt,text/vtt,application/x-subrip"
+                  onChange={onLoadSubtitle}
+                />
+                <PopoverText>
+                  {subtitleName ? subtitleName : "Load a subtitle file"}
+                </PopoverText>
+              </PopoverRow>
+              {subtitleName ? (
+                <>
+                  <PopoverRow>
+                    <MenuToggle htmlFor="subtitles-enabled">
+                      <CheckboxInput
+                        id="subtitles-enabled"
+                        type="checkbox"
+                        checked={subtitlesEnabled}
+                        onChange={onToggleSubtitles}
+                      />
+                      Show captions (S)
+                    </MenuToggle>
+                  </PopoverRow>
+                  <PopoverRow>
+                    <MiniButton type="button" onClick={onClearSubtitles}>
+                      Remove subtitles
+                    </MiniButton>
+                  </PopoverRow>
+                </>
+              ) : null}
             </MenuPopoverPanel>
           </MenuPopover>
         </ToolbarGroup>

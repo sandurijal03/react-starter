@@ -667,6 +667,25 @@ export const ViewerPanel = styled.section<{
       : ''}
 `;
 
+export const CaptionOverlay = styled.div`
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  max-width: min(90%, 900px);
+  text-align: center;
+  white-space: pre-wrap;
+  font-size: clamp(0.9rem, 2.4vw, 1.45rem);
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 0.15em 0.55em;
+  border-radius: 6px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  z-index: 35;
+`;
+
 export const BufferingSpinner = styled.div`
   position: absolute;
   top: 50%;

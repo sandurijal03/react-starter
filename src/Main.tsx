@@ -43,6 +43,7 @@ import {
   VR_MODE_STORAGE_KEY,
   writeStoredPosition,
 } from './utils/storage';
+import { findActiveCue, parseSubtitles, SubtitleCue } from './utils/subtitles';
 
 type XRNavigator = Navigator & {
   xr?: {
@@ -78,6 +79,9 @@ const Main: React.FC = () => {
   // ephemeral blob URLs that won't survive a restart).
   const resumeSrcRef = React.useRef<string | null>(null);
   const lastSavedPositionRef = React.useRef<number>(0);
+  const subtitleCuesRef = React.useRef<SubtitleCue[]>([]);
+  const subtitlesEnabledRef = React.useRef<boolean>(false);
+  const lastCaptionRef = React.useRef<string>('');
 
   const currentTextureSetRef = React.useRef<TextureSet | null>(null);
   const videoTextureSetRef = React.useRef<TextureSet | null>(null);
@@ -141,6 +145,10 @@ const Main: React.FC = () => {
     DEFAULT_PLAYBACK_RATE,
   );
   const [isLooping, setIsLooping] = React.useState<boolean>(readStoredLooping);
+  const [subtitlesEnabled, setSubtitlesEnabled] =
+    React.useState<boolean>(false);
+  const [subtitleName, setSubtitleName] = React.useState<string>('');
+  const [activeCaption, setActiveCaption] = React.useState<string>('');
   const [playlist, setPlaylist] = React.useState<PlaylistItem[]>([]);
   const [currentIndex, setCurrentIndex] = React.useState<number>(-1);
   const [recentItems, setRecentItems] = React.useState<PlaylistItem[]>(
@@ -632,6 +640,16 @@ const Main: React.FC = () => {
       if (Math.abs(current - lastSavedPositionRef.current) >= 5) {
         lastSavedPositionRef.current = current;
         persistPosition();
+      }
+
+      // Update the active subtitle caption.
+      const caption =
+        subtitlesEnabledRef.current && subtitleCuesRef.current.length > 0
+          ? findActiveCue(subtitleCuesRef.current, current)
+          : '';
+      if (caption !== lastCaptionRef.current) {
+        lastCaptionRef.current = caption;
+        setActiveCaption(caption);
       }
     };
     const onVideoEmptied = (): void => {
@@ -1232,6 +1250,55 @@ const Main: React.FC = () => {
     }
   }, []);
 
+  React.useEffect(() => {
+    subtitlesEnabledRef.current = subtitlesEnabled;
+    if (!subtitlesEnabled) {
+      lastCaptionRef.current = '';
+      setActiveCaption('');
+    }
+  }, [subtitlesEnabled]);
+
+  const loadSubtitleFile = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>): void => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          const cues = parseSubtitles(await file.text());
+          subtitleCuesRef.current = cues;
+          lastCaptionRef.current = '';
+          setActiveCaption('');
+          setSubtitleName(file.name);
+          setSubtitlesEnabled(cues.length > 0);
+          setStatus(
+            cues.length > 0
+              ? `Loaded ${cues.length} subtitle cues from ${file.name}.`
+              : `No subtitle cues found in ${file.name}.`,
+          );
+        } catch {
+          setStatus('Unable to read the subtitle file.');
+        }
+      })();
+    },
+    [],
+  );
+
+  const toggleSubtitles = React.useCallback((): void => {
+    setSubtitlesEnabled((value) => !value);
+  }, []);
+
+  const clearSubtitles = React.useCallback((): void => {
+    subtitleCuesRef.current = [];
+    lastCaptionRef.current = '';
+    setActiveCaption('');
+    setSubtitleName('');
+    setSubtitlesEnabled(false);
+  }, []);
+
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current;
     if (!video || loadedMedia !== 'video' || currentIndexRef.current < 0) {
@@ -1420,6 +1487,16 @@ const Main: React.FC = () => {
         return;
       }
 
+      if (key === 's') {
+        event.preventDefault();
+        if (subtitleCuesRef.current.length > 0) {
+          toggleSubtitles();
+        } else {
+          setStatus('Load a subtitle file first.');
+        }
+        return;
+      }
+
       if (key === 'c') {
         event.preventDefault();
         recenterView();
@@ -1437,6 +1514,7 @@ const Main: React.FC = () => {
     toggleFullscreen,
     toggleMute,
     togglePlayback,
+    toggleSubtitles,
   ]);
 
   const canPlayPrevious = currentIndex > 0;
@@ -1455,6 +1533,7 @@ const Main: React.FC = () => {
           mountRef={mountRef}
           isFullscreen={isImmersive}
           isBuffering={isBuffering}
+          caption={subtitlesEnabled ? activeCaption : ''}
           controls={
             <PlayerControls
               insidePlayer
@@ -1474,6 +1553,8 @@ const Main: React.FC = () => {
               playbackRate={playbackRate}
               playbackRateOptions={PLAYBACK_RATE_OPTIONS}
               isLooping={isLooping}
+              subtitlesEnabled={subtitlesEnabled}
+              subtitleName={subtitleName}
               playlist={playlist}
               currentIndex={currentIndex}
               canPlayPrevious={canPlayPrevious}
@@ -1501,6 +1582,9 @@ const Main: React.FC = () => {
               onPlaybackRateChange={setPlaybackRate}
               onLoopChange={setIsLooping}
               onRecenter={recenterView}
+              onLoadSubtitle={loadSubtitleFile}
+              onToggleSubtitles={toggleSubtitles}
+              onClearSubtitles={clearSubtitles}
               onPlayPrevious={playPrevious}
               onPlayNext={playNext}
               onSelectPlaylistItem={selectPlaylistItem}
