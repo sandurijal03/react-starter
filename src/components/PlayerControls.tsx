@@ -417,6 +417,12 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
             onChange={onVolumeChange}
             aria-label="Volume"
           />
+          <TimelineText
+            title="Volume"
+            style={{ minWidth: "3.2em", textAlign: "right" }}
+          >
+            {isMuted ? "Muted" : `${Math.round(volume * 100)}%`}
+          </TimelineText>
           <CompactSelect
             id="playback-rate"
             aria-label="Playback speed"

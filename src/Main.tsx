@@ -561,10 +561,24 @@ const Main: React.FC = () => {
       onPointerDownLat = 0;
     };
 
+    const onWheel = (event: WheelEvent): void => {
+      event.preventDefault();
+      const delta =
+        event.deltaY < 0 ? KEYBOARD_VOLUME_STEP : -KEYBOARD_VOLUME_STEP;
+      const next = Math.min(1, Math.max(0, video.volume + delta));
+      video.volume = next;
+      setVolume(next);
+      if (next > 0 && video.muted) {
+        video.muted = false;
+        setIsMuted(false);
+      }
+    };
+
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('pointerleave', onPointerUp);
+    renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
 
     const persistPosition = (): void => {
       const src = resumeSrcRef.current;
@@ -852,6 +866,7 @@ const Main: React.FC = () => {
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       renderer.domElement.removeEventListener('pointerleave', onPointerUp);
+      renderer.domElement.removeEventListener('wheel', onWheel);
 
       if (vrButton && mountEl.contains(vrButton)) {
         mountEl.removeChild(vrButton);
