@@ -202,8 +202,29 @@ function createWindow() {
     );
   };
 
-  mainWindow.on('enter-full-screen', sendWindowFullscreenState);
-  mainWindow.on('leave-full-screen', sendWindowFullscreenState);
+  const setMenuHidden = (hidden) => {
+    if (mainWindow.isDestroyed()) {
+      return;
+    }
+
+    // Hide the native File/View menu bar while immersive and bring it back on
+    // exit. autoHideMenuBar keeps it reachable via Alt if needed.
+    mainWindow.autoHideMenuBar = hidden;
+    mainWindow.setMenuBarVisibility(!hidden);
+  };
+
+  mainWindow.on('enter-full-screen', () => {
+    sendWindowFullscreenState();
+    setMenuHidden(true);
+  });
+  mainWindow.on('leave-full-screen', () => {
+    sendWindowFullscreenState();
+    setMenuHidden(false);
+  });
+  // The in-app fullscreen button uses HTML element fullscreen, which fires
+  // these rather than the window full-screen events.
+  mainWindow.on('enter-html-full-screen', () => setMenuHidden(true));
+  mainWindow.on('leave-html-full-screen', () => setMenuHidden(false));
   mainWindow.on('maximize', sendWindowMaximizeState);
   mainWindow.on('unmaximize', sendWindowMaximizeState);
 
