@@ -1,6 +1,10 @@
 import * as React from 'react';
 
-import { ViewerCanvas, ViewerControlsWrap, ViewerPanel } from './playerStyles';
+import {
+  ViewerCanvas,
+  ViewerControlsWrap,
+  ViewerPanel,
+} from '../styles/playerStyles';
 
 type PlayerViewerProps = {
   shellRef?: React.RefObject<HTMLElement | null>;

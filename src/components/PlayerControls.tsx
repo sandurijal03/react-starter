@@ -30,7 +30,7 @@ import {
   ToolbarGroup,
   UrlInput,
   VolumeSlider,
-} from "./playerStyles";
+} from "../styles/playerStyles";
 import {
   MediaHint,
   LoadedMedia,

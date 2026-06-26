@@ -3,8 +3,8 @@ import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import Hls from 'hls.js';
 import PlayerControls from './components/PlayerControls';
-import { GlobalStyle, PlayerRoot } from './components/playerStyles';
 import PlayerViewer from './components/PlayerViewer';
+import { GlobalStyle, PlayerRoot } from './styles/playerStyles';
 import {
   LoadedMedia,
   MediaHint,
@@ -12,6 +12,35 @@ import {
   ProjectionMode,
   StereoLayout,
 } from './types/player';
+import { formatTime } from './utils/format';
+import {
+  detectMediaTraits,
+  HLS_EXTENSIONS,
+  inferMediaType,
+  PERSISTABLE_SOURCE,
+} from './utils/media';
+import {
+  applyStereoLayoutToTextureSet,
+  createProjectionGeometry,
+  createTextureSet,
+  disposeTextureSet,
+  TextureSet,
+} from './utils/texture';
+import {
+  clampFitThreshold,
+  DEFAULT_FIT_THRESHOLD,
+  FIT_THRESHOLD_STORAGE_KEY,
+  LOOP_STORAGE_KEY,
+  MAX_RECENT_ITEMS,
+  readStoredFitThreshold,
+  readStoredLooping,
+  readStoredRecentItems,
+  readStoredStereoLayout,
+  readStoredVrModeEnabled,
+  RECENT_STORAGE_KEY,
+  STEREO_LAYOUT_STORAGE_KEY,
+  VR_MODE_STORAGE_KEY,
+} from './utils/storage';
 
 type XRNavigator = Navigator & {
   xr?: {
@@ -19,277 +48,12 @@ type XRNavigator = Navigator & {
   };
 };
 
-type TextureSet = {
-  base: THREE.Texture;
-  left: THREE.Texture;
-  right: THREE.Texture;
-  isVideo: boolean;
-};
-
-const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|bmp|gif)(\?.*)?$/i;
-const VIDEO_EXTENSIONS = /\.(mp4|webm|mov|m4v|ogv|m3u8)(\?.*)?$/i;
-const HLS_EXTENSIONS = /\.m3u8(\?.*)?$/i;
-const PERSISTABLE_SOURCE = /^(https?|file):/i;
-
-const RECENT_STORAGE_KEY = 'vr_player_recent_media';
-const MAX_RECENT_ITEMS = 12;
-const PLAYBACK_RATE_OPTIONS = [0.5, 1, 1.5, 2];
-const DEFAULT_PLAYBACK_RATE = 1;
-
-const formatTime = (seconds: number): string => {
-  const pad2 = (value: number): string =>
-    value < 10 ? `0${value}` : String(value);
-
-  if (!Number.isFinite(seconds) || seconds < 0) {
-    return '00:00';
-  }
-
-  const wholeSeconds = Math.floor(seconds);
-  const hours = Math.floor(wholeSeconds / 3600);
-  const minutes = Math.floor((wholeSeconds % 3600) / 60);
-  const secs = wholeSeconds % 60;
-
-  if (hours > 0) {
-    return `${pad2(hours)}:${pad2(minutes)}:${pad2(secs)}`;
-  }
-
-  return `${pad2(minutes)}:${pad2(secs)}`;
-};
-
-const inferMediaType = (
-  value: string,
-  hint: MediaHint,
-): Exclude<LoadedMedia, null> => {
-  if (hint === 'video') {
-    return 'video';
-  }
-
-  if (hint === 'image') {
-    return 'image';
-  }
-
-  if (IMAGE_EXTENSIONS.test(value)) {
-    return 'image';
-  }
-
-  if (VIDEO_EXTENSIONS.test(value)) {
-    return 'video';
-  }
-
-  return 'video';
-};
-
-// Best-effort detection of projection / stereo layout from a file name or URL,
-// using the conventions panoramic media is usually tagged with (e.g.
-// "clip_180_TB.mp4", "beach-360-sbs.jpg"). Only returns fields it is confident
-// about so the user's current settings are left untouched otherwise.
-const detectMediaTraits = (
-  value: string,
-): { projection?: ProjectionMode; stereo?: StereoLayout } => {
-  const name = value.toLowerCase();
-  const traits: { projection?: ProjectionMode; stereo?: StereoLayout } = {};
-
-  if (/(^|[^0-9])180([^0-9]|$)/.test(name)) {
-    traits.projection = '180';
-  } else if (/(^|[^0-9])360([^0-9]|$)/.test(name)) {
-    traits.projection = '360';
-  }
-
-  if (/(\b|_|-)(tb|ou|top[-_]?bottom|over[-_]?under)(\b|_|-|\.)/.test(name)) {
-    traits.stereo = 'top-bottom';
-  } else if (
-    /(\b|_|-)(sbs|lr|left[-_]?right|side[-_]?by[-_]?side|3dh)(\b|_|-|\.)/.test(
-      name,
-    )
-  ) {
-    traits.stereo = 'left-right';
-  }
-
-  return traits;
-};
-
-const readStoredLooping = (): boolean => {
-  try {
-    const stored = window.localStorage.getItem(LOOP_STORAGE_KEY);
-    // Default to looping (the historical behaviour) when nothing is stored.
-    return stored === null ? true : stored === 'true' || stored === '1';
-  } catch {
-    return true;
-  }
-};
-
-const createProjectionGeometry = (
-  mode: ProjectionMode,
-): THREE.SphereGeometry => {
-  const geometry =
-    mode === '180'
-      ? new THREE.SphereGeometry(500, 72, 48, -Math.PI / 2, Math.PI)
-      : new THREE.SphereGeometry(500, 72, 48);
-
-  geometry.scale(-1, 1, 1);
-  return geometry;
-};
-
-const cloneTexture = (source: THREE.Texture): THREE.Texture => {
-  const clone = source.clone();
-  clone.needsUpdate = true;
-  return clone;
-};
-
-const createTextureSet = (
-  base: THREE.Texture,
-  isVideo: boolean,
-): TextureSet => {
-  return {
-    base,
-    left: cloneTexture(base),
-    right: cloneTexture(base),
-    isVideo,
-  };
-};
-
-const disposeTextureSet = (set: TextureSet | null): void => {
-  if (!set) {
-    return;
-  }
-
-  if (set.isVideo) {
-    set.base.dispose();
-    set.left.dispose();
-    set.right.dispose();
-    return;
-  }
-
-  set.base.dispose();
-  set.left.dispose();
-  set.right.dispose();
-};
-
-const applyStereoLayoutToTextureSet = (
-  layout: StereoLayout,
-  set: TextureSet,
-  swapEyes: boolean,
-): void => {
-  const targets = [set.left, set.right];
-
-  for (const texture of targets) {
-    texture.repeat.set(1, 1);
-    texture.offset.set(0, 0);
-    texture.needsUpdate = true;
-  }
-
-  if (layout === 'left-right') {
-    set.left.repeat.set(0.5, 1);
-    set.left.offset.set(swapEyes ? 0.5 : 0, 0);
-    set.right.repeat.set(0.5, 1);
-    set.right.offset.set(swapEyes ? 0 : 0.5, 0);
-  }
-
-  if (layout === 'top-bottom') {
-    set.left.repeat.set(1, 0.5);
-    set.left.offset.set(0, swapEyes ? 0 : 0.5);
-    set.right.repeat.set(1, 0.5);
-    set.right.offset.set(0, swapEyes ? 0.5 : 0);
-  }
-
-  set.left.needsUpdate = true;
-  set.right.needsUpdate = true;
-};
-
 const DEFAULT_SOURCE =
   'https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4';
-const VR_MODE_STORAGE_KEY = 'vr_player_vr_mode';
-const LOOP_STORAGE_KEY = 'vr_player_loop';
-const STEREO_LAYOUT_STORAGE_KEY = 'vr_player_stereo_layout';
-const FIT_THRESHOLD_STORAGE_KEY = 'vr_player_fit_threshold';
-const MIN_FIT_THRESHOLD = 0.05;
-const MAX_FIT_THRESHOLD = 0.5;
-const DEFAULT_FIT_THRESHOLD = 0.22;
 const KEYBOARD_SEEK_STEP_SECONDS = 10;
 const KEYBOARD_VOLUME_STEP = 0.05;
-
-const clampFitThreshold = (value: number): number =>
-  Math.min(MAX_FIT_THRESHOLD, Math.max(MIN_FIT_THRESHOLD, value));
-
-const readStoredFitThreshold = (): number => {
-  try {
-    const stored = window.localStorage.getItem(FIT_THRESHOLD_STORAGE_KEY);
-    if (!stored) {
-      return DEFAULT_FIT_THRESHOLD;
-    }
-
-    const parsed = Number(stored);
-    if (!Number.isFinite(parsed)) {
-      return DEFAULT_FIT_THRESHOLD;
-    }
-
-    return clampFitThreshold(parsed);
-  } catch {
-    return DEFAULT_FIT_THRESHOLD;
-  }
-};
-
-const isStereoLayout = (value: string): value is StereoLayout =>
-  value === 'mono' || value === 'left-right' || value === 'top-bottom';
-
-const readStoredStereoLayout = (): StereoLayout => {
-  try {
-    const stored = window.localStorage.getItem(STEREO_LAYOUT_STORAGE_KEY);
-    if (!stored || !isStereoLayout(stored)) {
-      return 'mono';
-    }
-
-    return stored;
-  } catch {
-    return 'mono';
-  }
-};
-
-const readStoredVrModeEnabled = (): boolean => {
-  try {
-    const stored = window.localStorage.getItem(VR_MODE_STORAGE_KEY);
-    return stored === 'true' || stored === '1';
-  } catch {
-    return false;
-  }
-};
-
-const isMediaHint = (value: unknown): value is MediaHint =>
-  value === 'auto' || value === 'video' || value === 'image';
-
-const readStoredRecentItems = (): PlaylistItem[] => {
-  try {
-    const stored = window.localStorage.getItem(RECENT_STORAGE_KEY);
-    if (!stored) {
-      return [];
-    }
-
-    const parsed: unknown = JSON.parse(stored);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter(
-        (entry): entry is { src: string; label: string; hint: MediaHint } =>
-          Boolean(entry) &&
-          typeof entry === 'object' &&
-          typeof (entry as { src?: unknown }).src === 'string' &&
-          typeof (entry as { label?: unknown }).label === 'string' &&
-          isMediaHint((entry as { hint?: unknown }).hint),
-      )
-      .slice(0, MAX_RECENT_ITEMS)
-      .map((entry, index) => ({
-        id: `recent-${index}-${entry.src}`,
-        src: entry.src,
-        label: entry.label,
-        hint: entry.hint,
-        persistable: true,
-      }));
-  } catch {
-    return [];
-  }
-};
+const PLAYBACK_RATE_OPTIONS = [0.5, 1, 1.5, 2];
+const DEFAULT_PLAYBACK_RATE = 1;
 
 const Main: React.FC = () => {
   const isDesktopApp = Boolean(window.electronAPI?.isDesktop);
