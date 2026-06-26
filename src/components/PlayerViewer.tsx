@@ -1,6 +1,7 @@
 import * as React from 'react';
 
 import {
+  BufferingSpinner,
   ViewerCanvas,
   ViewerControlsWrap,
   ViewerPanel,
@@ -11,6 +12,7 @@ type PlayerViewerProps = {
   mountRef: React.RefObject<HTMLDivElement | null>;
   controls?: React.ReactNode;
   isFullscreen?: boolean;
+  isBuffering?: boolean;
 };
 
 // How long the controls stay visible after the last pointer activity before
@@ -22,6 +24,7 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
   mountRef,
   controls,
   isFullscreen = false,
+  isBuffering = false,
 }) => {
   const [showFloatingControls, setShowFloatingControls] =
     React.useState<boolean>(true);
@@ -81,6 +84,7 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
       onTouchStart={revealControls}
     >
       <ViewerCanvas ref={mountRef} $isFullscreen={isFullscreen} />
+      {isBuffering ? <BufferingSpinner aria-label="Buffering" /> : null}
       {controls ? (
         <ViewerControlsWrap
           $floating={isFullscreen}

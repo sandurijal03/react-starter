@@ -21,11 +21,13 @@ import {
   PopoverRow,
   PopoverText,
   PopoverTitle,
+  SeekTooltip,
   StatusSubtle,
   StatusText,
   StyledSelect,
   TimelineRow,
   TimelineSlider,
+  TimelineSliderWrap,
   TimelineText,
   ToolbarGroup,
   UrlInput,
@@ -38,6 +40,7 @@ import {
   ProjectionMode,
   StereoLayout,
 } from "../types/player";
+import { formatTime } from "../utils/format";
 
 type PlayerControlsProps = {
   insidePlayer?: boolean;
@@ -261,6 +264,25 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSelectRecentItem,
   onClearRecents,
 }) => {
+  const [seekHover, setSeekHover] = React.useState<{
+    x: number;
+    time: number;
+  } | null>(null);
+
+  const onSeekHoverMove = (
+    event: React.MouseEvent<HTMLDivElement>,
+  ): void => {
+    if (loadedMedia !== "video" || timelineDuration <= 0) {
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    setSeekHover({ x: ratio * rect.width, time: ratio * timelineDuration });
+  };
+
+  const onSeekHoverLeave = (): void => setSeekHover(null);
+
   return (
     <ControlsPanel $insidePlayer={insidePlayer}>
       <CompactToolbar>
@@ -331,7 +353,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
           <IconButton
             type="button"
             onClick={onTogglePlayback}
-            disabled={loadedMedia !== "video"}
+            disabled={loadedMedia !== "video" || currentIndex < 0}
             title={isPlaying ? "Pause" : "Play"}
             aria-label={isPlaying ? "Pause" : "Play"}
             $active={isPlaying}
@@ -579,16 +601,26 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
 
       <TimelineRow>
         <label htmlFor="timeline-slider">Timeline</label>
-        <TimelineSlider
-          id="timeline-slider"
-          type="range"
-          min="0"
-          max={timelineDuration > 0 ? timelineDuration : 0}
-          step="0.01"
-          value={Math.min(timelineCurrent, timelineDuration || 0)}
-          onChange={onSeekChange}
-          disabled={loadedMedia !== "video" || timelineDuration <= 0}
-        />
+        <TimelineSliderWrap
+          onMouseMove={onSeekHoverMove}
+          onMouseLeave={onSeekHoverLeave}
+        >
+          <TimelineSlider
+            id="timeline-slider"
+            type="range"
+            min="0"
+            max={timelineDuration > 0 ? timelineDuration : 0}
+            step="0.01"
+            value={Math.min(timelineCurrent, timelineDuration || 0)}
+            onChange={onSeekChange}
+            disabled={loadedMedia !== "video" || timelineDuration <= 0}
+          />
+          {seekHover ? (
+            <SeekTooltip style={{ left: `${seekHover.x}px` }}>
+              {formatTime(seekHover.time)}
+            </SeekTooltip>
+          ) : null}
+        </TimelineSliderWrap>
         <TimelineText>{timelineLabel}</TimelineText>
       </TimelineRow>
 

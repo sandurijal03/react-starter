@@ -5,6 +5,9 @@ export const LOOP_STORAGE_KEY = 'vr_player_loop';
 export const STEREO_LAYOUT_STORAGE_KEY = 'vr_player_stereo_layout';
 export const FIT_THRESHOLD_STORAGE_KEY = 'vr_player_fit_threshold';
 export const RECENT_STORAGE_KEY = 'vr_player_recent_media';
+export const POSITION_STORAGE_KEY = 'vr_player_positions';
+
+const MAX_POSITION_ENTRIES = 50;
 
 export const MIN_FIT_THRESHOLD = 0.05;
 export const MAX_FIT_THRESHOLD = 0.5;
@@ -64,6 +67,47 @@ export const readStoredLooping = (): boolean => {
     return stored === null ? true : stored === 'true' || stored === '1';
   } catch {
     return true;
+  }
+};
+
+// Per-source resume positions, keyed by the (persistable) media URL.
+export const readStoredPosition = (src: string): number => {
+  try {
+    const raw = window.localStorage.getItem(POSITION_STORAGE_KEY);
+    if (!raw) {
+      return 0;
+    }
+
+    const map = JSON.parse(raw) as Record<string, number>;
+    const value = map?.[src];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const writeStoredPosition = (src: string, seconds: number): void => {
+  try {
+    const raw = window.localStorage.getItem(POSITION_STORAGE_KEY);
+    const map: Record<string, number> = raw ? JSON.parse(raw) : {};
+
+    if (seconds <= 0) {
+      delete map[src];
+    } else {
+      map[src] = seconds;
+    }
+
+    // Keep the map bounded by dropping the oldest-inserted entries.
+    const keys = Object.keys(map);
+    if (keys.length > MAX_POSITION_ENTRIES) {
+      for (const key of keys.slice(0, keys.length - MAX_POSITION_ENTRIES)) {
+        delete map[key];
+      }
+    }
+
+    window.localStorage.setItem(POSITION_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore persistence errors (private mode / blocked storage).
   }
 };
 

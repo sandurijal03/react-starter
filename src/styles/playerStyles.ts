@@ -1,6 +1,12 @@
-import styled, { createGlobalStyle, css } from 'styled-components';
+import styled, { createGlobalStyle, css, keyframes } from 'styled-components';
 
 const MOBILE_BREAKPOINT = '720px';
+
+const spin = keyframes`
+  to {
+    transform: rotate(360deg);
+  }
+`;
 
 const panelSurface = css`
   background: linear-gradient(180deg, var(--panel), var(--panel-2));
@@ -594,9 +600,32 @@ export const TimelineRow = styled.div`
   }
 `;
 
+export const TimelineSliderWrap = styled.div`
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+`;
+
 export const TimelineSlider = styled.input`
   width: 100%;
   accent-color: var(--accent);
+`;
+
+export const SeekTooltip = styled.div`
+  position: absolute;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 0.15rem 0.4rem;
+  border-radius: 5px;
+  background: rgba(12, 14, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
 `;
 
 export const TimelineText = styled.span`
@@ -636,6 +665,21 @@ export const ViewerPanel = styled.section<{
     background: #000;
   `
       : ''}
+`;
+
+export const BufferingSpinner = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  animation: ${spin} 0.85s linear infinite;
+  pointer-events: none;
+  z-index: 40;
 `;
 
 export const ViewerControlsWrap = styled.div<{

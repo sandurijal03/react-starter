@@ -34,12 +34,14 @@ import {
   MAX_RECENT_ITEMS,
   readStoredFitThreshold,
   readStoredLooping,
+  readStoredPosition,
   readStoredRecentItems,
   readStoredStereoLayout,
   readStoredVrModeEnabled,
   RECENT_STORAGE_KEY,
   STEREO_LAYOUT_STORAGE_KEY,
   VR_MODE_STORAGE_KEY,
+  writeStoredPosition,
 } from './utils/storage';
 
 type XRNavigator = Navigator & {
@@ -71,6 +73,11 @@ const Main: React.FC = () => {
   const playlistRef = React.useRef<PlaylistItem[]>([]);
   const currentIndexRef = React.useRef<number>(-1);
   const playbackRateRef = React.useRef<number>(DEFAULT_PLAYBACK_RATE);
+  const togglePlaybackRef = React.useRef<() => void>(() => undefined);
+  // Source whose playback position should be resumed/persisted (null for
+  // ephemeral blob URLs that won't survive a restart).
+  const resumeSrcRef = React.useRef<string | null>(null);
+  const lastSavedPositionRef = React.useRef<number>(0);
 
   const currentTextureSetRef = React.useRef<TextureSet | null>(null);
   const videoTextureSetRef = React.useRef<TextureSet | null>(null);
@@ -119,6 +126,7 @@ const Main: React.FC = () => {
     'Scene ready. Load media and press Play.',
   );
   const [isPlaying, setIsPlaying] = React.useState<boolean>(false);
+  const [isBuffering, setIsBuffering] = React.useState<boolean>(false);
   const [isMuted, setIsMuted] = React.useState<boolean>(false);
   const [volume, setVolume] = React.useState<number>(1);
   const [timelineCurrent, setTimelineCurrent] = React.useState<number>(0);
@@ -492,6 +500,7 @@ const Main: React.FC = () => {
     let lon = 0;
     let lat = 0;
     let isPointerDown = false;
+    let pointerMoved = false;
     let onPointerDownPointerX = 0;
     let onPointerDownPointerY = 0;
     let onPointerDownLon = 0;
@@ -499,6 +508,7 @@ const Main: React.FC = () => {
 
     const onPointerDown = (event: PointerEvent): void => {
       isPointerDown = true;
+      pointerMoved = false;
       onPointerDownPointerX = event.clientX;
       onPointerDownPointerY = event.clientY;
       onPointerDownLon = lon;
@@ -510,11 +520,28 @@ const Main: React.FC = () => {
         return;
       }
 
+      if (
+        Math.abs(event.clientX - onPointerDownPointerX) > 4 ||
+        Math.abs(event.clientY - onPointerDownPointerY) > 4
+      ) {
+        pointerMoved = true;
+      }
+
       lon = (onPointerDownPointerX - event.clientX) * 0.15 + onPointerDownLon;
       lat = (event.clientY - onPointerDownPointerY) * 0.15 + onPointerDownLat;
     };
 
-    const onPointerUp = (): void => {
+    const onPointerUp = (event: PointerEvent): void => {
+      // A click (press without drag) on the video toggles playback.
+      if (
+        isPointerDown &&
+        !pointerMoved &&
+        event.type === 'pointerup' &&
+        event.button === 0
+      ) {
+        togglePlaybackRef.current();
+      }
+
       isPointerDown = false;
     };
 
@@ -530,27 +557,82 @@ const Main: React.FC = () => {
     renderer.domElement.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('pointerleave', onPointerUp);
 
-    const onVideoPlay = (): void => setIsPlaying(true);
-    const onVideoPause = (): void => setIsPlaying(false);
+    const persistPosition = (): void => {
+      const src = resumeSrcRef.current;
+      if (!src) {
+        return;
+      }
+
+      const current = video.currentTime;
+      const duration = video.duration;
+      // Drop positions near the very start or end so we never resume a clip
+      // that effectively finished.
+      if (
+        !Number.isFinite(duration) ||
+        current < 5 ||
+        current > duration - 5
+      ) {
+        writeStoredPosition(src, 0);
+        return;
+      }
+
+      writeStoredPosition(src, current);
+    };
+
+    const onVideoPlay = (): void => {
+      setIsPlaying(true);
+      setIsBuffering(false);
+    };
+    const onVideoPause = (): void => {
+      setIsPlaying(false);
+      persistPosition();
+    };
+    const onVideoWaiting = (): void => setIsBuffering(true);
+    const onVideoPlaying = (): void => setIsBuffering(false);
     const onVideoEnded = (): void => {
       setIsPlaying(false);
+      const src = resumeSrcRef.current;
+      if (src) {
+        writeStoredPosition(src, 0);
+      }
       // Only fires when looping is off; advance to the next queued item.
       autoAdvanceRef.current();
     };
     const onVideoCanPlay = (): void => {
+      setIsBuffering(false);
       setLoadedMedia('video');
       setStatus('Video loaded. Use Enter VR to watch in headset.');
     };
-    const onVideoError = (): void =>
+    const onVideoError = (): void => {
+      setIsBuffering(false);
       setStatus('Unable to load media. Try another URL or local file.');
+    };
     const onVideoLoadedMetadata = (): void => {
       video.playbackRate = playbackRateRef.current;
+
+      // Resume a previously saved position for this source.
+      const src = resumeSrcRef.current;
+      if (src && Number.isFinite(video.duration)) {
+        const saved = readStoredPosition(src);
+        if (saved > 1 && saved < video.duration - 2) {
+          video.currentTime = saved;
+        }
+      }
+      lastSavedPositionRef.current = video.currentTime || 0;
+
       setTimelineDuration(Number.isFinite(video.duration) ? video.duration : 0);
       setTimelineCurrent(video.currentTime || 0);
       updateFlatMeshSize();
     };
     const onVideoTimeUpdate = (): void => {
-      setTimelineCurrent(video.currentTime || 0);
+      const current = video.currentTime || 0;
+      setTimelineCurrent(current);
+
+      // Throttle resume-position writes to roughly every 5 seconds.
+      if (Math.abs(current - lastSavedPositionRef.current) >= 5) {
+        lastSavedPositionRef.current = current;
+        persistPosition();
+      }
     };
     const onVideoEmptied = (): void => {
       setTimelineCurrent(0);
@@ -577,6 +659,8 @@ const Main: React.FC = () => {
 
     video.addEventListener('play', onVideoPlay);
     video.addEventListener('pause', onVideoPause);
+    video.addEventListener('waiting', onVideoWaiting);
+    video.addEventListener('playing', onVideoPlaying);
     video.addEventListener('ended', onVideoEnded);
     video.addEventListener('canplay', onVideoCanPlay);
     video.addEventListener('error', onVideoError);
@@ -680,6 +764,8 @@ const Main: React.FC = () => {
 
       video.removeEventListener('play', onVideoPlay);
       video.removeEventListener('pause', onVideoPause);
+      video.removeEventListener('waiting', onVideoWaiting);
+      video.removeEventListener('playing', onVideoPlaying);
       video.removeEventListener('ended', onVideoEnded);
       video.removeEventListener('canplay', onVideoCanPlay);
       video.removeEventListener('error', onVideoError);
@@ -948,6 +1034,10 @@ const Main: React.FC = () => {
   const loadItemMedia = React.useCallback(
     (item: PlaylistItem): void => {
       const requestToken = ++loadTokenRef.current;
+      // Only persistable (http/file) sources are worth resuming; blob URLs are
+      // regenerated each session.
+      resumeSrcRef.current = item.persistable ? item.src : null;
+      lastSavedPositionRef.current = 0;
       if (item.persistable) {
         setSourceUrl(item.src);
       }
@@ -962,10 +1052,12 @@ const Main: React.FC = () => {
       }
 
       if (inferMediaType(item.src, item.hint) === 'image') {
+        setIsBuffering(false);
         void setImageSource(item.src, requestToken, item.label);
         return;
       }
 
+      setIsBuffering(true);
       setVideoSource(item.src, item.label);
     },
     [setImageSource, setVideoSource],
@@ -1142,8 +1234,8 @@ const Main: React.FC = () => {
 
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current;
-    if (!video || loadedMedia !== 'video') {
-      setStatus('Playback controls are available only for video media.');
+    if (!video || loadedMedia !== 'video' || currentIndexRef.current < 0) {
+      setStatus('Load a video first to control playback.');
       return;
     }
 
@@ -1162,6 +1254,10 @@ const Main: React.FC = () => {
     video.pause();
     setStatus('Paused.');
   };
+
+  // Keep the imperative renderer (click-to-play on the canvas) pointed at the
+  // latest playback toggle.
+  togglePlaybackRef.current = (): void => void togglePlayback();
 
   const toggleMute = (): void => {
     const video = videoRef.current;
@@ -1280,19 +1376,21 @@ const Main: React.FC = () => {
         }
       }
 
-      if (event.code === 'Space') {
+      const key = event.key.toLowerCase();
+
+      if (event.code === 'Space' || key === 'k') {
         event.preventDefault();
         void togglePlayback();
         return;
       }
 
-      if (event.key === 'ArrowLeft') {
+      if (event.key === 'ArrowLeft' || key === 'j') {
         event.preventDefault();
         seekBySeconds(-KEYBOARD_SEEK_STEP_SECONDS);
         return;
       }
 
-      if (event.key === 'ArrowRight') {
+      if (event.key === 'ArrowRight' || key === 'l') {
         event.preventDefault();
         seekBySeconds(KEYBOARD_SEEK_STEP_SECONDS);
         return;
@@ -1310,7 +1408,19 @@ const Main: React.FC = () => {
         return;
       }
 
-      if (event.key === 'c' || event.key === 'C') {
+      if (key === 'm') {
+        event.preventDefault();
+        toggleMute();
+        return;
+      }
+
+      if (key === 'f') {
+        event.preventDefault();
+        void toggleFullscreen();
+        return;
+      }
+
+      if (key === 'c') {
         event.preventDefault();
         recenterView();
       }
@@ -1320,7 +1430,14 @@ const Main: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [adjustVolumeByStep, recenterView, seekBySeconds, togglePlayback]);
+  }, [
+    adjustVolumeByStep,
+    recenterView,
+    seekBySeconds,
+    toggleFullscreen,
+    toggleMute,
+    togglePlayback,
+  ]);
 
   const canPlayPrevious = currentIndex > 0;
   const canPlayNext = currentIndex >= 0 && currentIndex < playlist.length - 1;
@@ -1337,6 +1454,7 @@ const Main: React.FC = () => {
           shellRef={playerShellRef}
           mountRef={mountRef}
           isFullscreen={isImmersive}
+          isBuffering={isBuffering}
           controls={
             <PlayerControls
               insidePlayer
