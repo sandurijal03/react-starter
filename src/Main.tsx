@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
-import Hls from 'hls.js';
+import type Hls from 'hls.js';
 import PlayerControls from './components/PlayerControls';
 import PlayerViewer from './components/PlayerViewer';
 import { GlobalStyle, PlayerRoot } from './styles/playerStyles';
@@ -50,6 +50,19 @@ type XRNavigator = Navigator & {
   xr?: {
     isSessionSupported: (mode: 'immersive-vr') => Promise<boolean>;
   };
+};
+
+// hls.js is only needed for .m3u8 streams, so load it on demand to keep it out
+// of the main bundle. The promise is cached so the chunk loads at most once.
+type HlsModule = typeof import('hls.js')['default'];
+let hlsModulePromise: Promise<HlsModule> | null = null;
+const loadHls = (): Promise<HlsModule> => {
+  if (!hlsModulePromise) {
+    hlsModulePromise = import(/* webpackChunkName: "hls" */ 'hls.js').then(
+      (module) => module.default,
+    );
+  }
+  return hlsModulePromise;
 };
 
 const DEFAULT_SOURCE =
@@ -956,18 +969,38 @@ const Main: React.FC = () => {
         video.canPlayType('application/vnd.apple.mpegurl'),
       );
 
-      if (isHls && !canPlayNativeHls && Hls.isSupported()) {
-        // Chromium/Electron has no native HLS, so demux via hls.js.
+      if (isHls && !canPlayNativeHls) {
+        // Chromium/Electron has no native HLS, so demux via hls.js, loaded
+        // lazily. Guard against a newer load superseding this one.
+        const token = loadTokenRef.current;
         video.removeAttribute('src');
-        const hls = new Hls();
-        hlsRef.current = hls;
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) {
-            setStatus(`Unable to load ${label} stream (HLS error).`);
-          }
-        });
-        hls.loadSource(source);
-        hls.attachMedia(video);
+        void loadHls()
+          .then((HlsCtor) => {
+            if (token !== loadTokenRef.current) {
+              return;
+            }
+
+            if (!HlsCtor.isSupported()) {
+              video.src = source;
+              video.load();
+              return;
+            }
+
+            const hls = new HlsCtor();
+            hlsRef.current = hls;
+            hls.on(HlsCtor.Events.ERROR, (_event, data) => {
+              if (data.fatal) {
+                setStatus(`Unable to load ${label} stream (HLS error).`);
+              }
+            });
+            hls.loadSource(source);
+            hls.attachMedia(video);
+          })
+          .catch(() => {
+            if (token === loadTokenRef.current) {
+              setStatus(`Unable to load ${label} stream (HLS unavailable).`);
+            }
+          });
       } else {
         video.removeAttribute('src');
         video.src = source;
