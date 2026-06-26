@@ -56,6 +56,7 @@ type PlayerControlsProps = {
   volume: number;
   playbackRate: number;
   playbackRateOptions: number[];
+  isLooping: boolean;
   playlist: PlaylistItem[];
   currentIndex: number;
   canPlayPrevious: boolean;
@@ -81,6 +82,8 @@ type PlayerControlsProps = {
   onVolumeChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onSeekChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onPlaybackRateChange: (value: number) => void;
+  onLoopChange: (value: boolean) => void;
+  onRecenter: () => void;
   onPlayPrevious: () => void;
   onPlayNext: () => void;
   onSelectPlaylistItem: (id: string) => void;
@@ -224,6 +227,7 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   volume,
   playbackRate,
   playbackRateOptions,
+  isLooping,
   playlist,
   currentIndex,
   canPlayPrevious,
@@ -249,6 +253,8 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
   onVolumeChange,
   onSeekChange,
   onPlaybackRateChange,
+  onLoopChange,
+  onRecenter,
   onPlayPrevious,
   onPlayNext,
   onSelectPlaylistItem,
@@ -428,6 +434,17 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                 </MenuToggle>
               </PopoverRow>
               <PopoverRow>
+                <MenuToggle htmlFor="loop-enabled">
+                  <CheckboxInput
+                    id="loop-enabled"
+                    type="checkbox"
+                    checked={isLooping}
+                    onChange={(event) => onLoopChange(event.target.checked)}
+                  />
+                  Loop
+                </MenuToggle>
+              </PopoverRow>
+              <PopoverRow>
                 <PopoverText>Crop</PopoverText>
                 <VolumeSlider
                   id="fit-threshold-slider"
@@ -444,6 +461,11 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
                 <TimelineText>
                   {Math.round(fitMismatchThreshold * 100)}%
                 </TimelineText>
+              </PopoverRow>
+              <PopoverRow>
+                <MiniButton type="button" onClick={onRecenter}>
+                  Recenter view (C)
+                </MiniButton>
               </PopoverRow>
             </MenuPopoverPanel>
           </MenuPopover>

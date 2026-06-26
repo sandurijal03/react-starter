@@ -79,6 +79,45 @@ const inferMediaType = (
   return 'video';
 };
 
+// Best-effort detection of projection / stereo layout from a file name or URL,
+// using the conventions panoramic media is usually tagged with (e.g.
+// "clip_180_TB.mp4", "beach-360-sbs.jpg"). Only returns fields it is confident
+// about so the user's current settings are left untouched otherwise.
+const detectMediaTraits = (
+  value: string,
+): { projection?: ProjectionMode; stereo?: StereoLayout } => {
+  const name = value.toLowerCase();
+  const traits: { projection?: ProjectionMode; stereo?: StereoLayout } = {};
+
+  if (/(^|[^0-9])180([^0-9]|$)/.test(name)) {
+    traits.projection = '180';
+  } else if (/(^|[^0-9])360([^0-9]|$)/.test(name)) {
+    traits.projection = '360';
+  }
+
+  if (/(\b|_|-)(tb|ou|top[-_]?bottom|over[-_]?under)(\b|_|-|\.)/.test(name)) {
+    traits.stereo = 'top-bottom';
+  } else if (
+    /(\b|_|-)(sbs|lr|left[-_]?right|side[-_]?by[-_]?side|3dh)(\b|_|-|\.)/.test(
+      name,
+    )
+  ) {
+    traits.stereo = 'left-right';
+  }
+
+  return traits;
+};
+
+const readStoredLooping = (): boolean => {
+  try {
+    const stored = window.localStorage.getItem(LOOP_STORAGE_KEY);
+    // Default to looping (the historical behaviour) when nothing is stored.
+    return stored === null ? true : stored === 'true' || stored === '1';
+  } catch {
+    return true;
+  }
+};
+
 const createProjectionGeometry = (
   mode: ProjectionMode,
 ): THREE.SphereGeometry => {
@@ -160,6 +199,7 @@ const applyStereoLayoutToTextureSet = (
 const DEFAULT_SOURCE =
   'https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4';
 const VR_MODE_STORAGE_KEY = 'vr_player_vr_mode';
+const LOOP_STORAGE_KEY = 'vr_player_loop';
 const STEREO_LAYOUT_STORAGE_KEY = 'vr_player_stereo_layout';
 const FIT_THRESHOLD_STORAGE_KEY = 'vr_player_fit_threshold';
 const MIN_FIT_THRESHOLD = 0.05;
@@ -276,6 +316,9 @@ const Main: React.FC = () => {
   const stereoLayoutRef = React.useRef<StereoLayout>('mono');
   const swapEyesRef = React.useRef<boolean>(false);
   const vrModeEnabledRef = React.useRef<boolean>(false);
+  const isLoopingRef = React.useRef<boolean>(true);
+  const recenterViewRef = React.useRef<() => void>(() => undefined);
+  const autoAdvanceRef = React.useRef<() => void>(() => undefined);
   const fitMismatchThresholdRef = React.useRef<number>(DEFAULT_FIT_THRESHOLD);
   const projectionModeRef = React.useRef<ProjectionMode>('360');
   const loadedMediaRef = React.useRef<LoadedMedia>(null);
@@ -325,6 +368,7 @@ const Main: React.FC = () => {
   const [playbackRate, setPlaybackRate] = React.useState<number>(
     DEFAULT_PLAYBACK_RATE,
   );
+  const [isLooping, setIsLooping] = React.useState<boolean>(readStoredLooping);
   const [playlist, setPlaylist] = React.useState<PlaylistItem[]>([]);
   const [currentIndex, setCurrentIndex] = React.useState<number>(-1);
   const [recentItems, setRecentItems] = React.useState<PlaylistItem[]>(
@@ -389,6 +433,20 @@ const Main: React.FC = () => {
       video.playbackRate = playbackRate;
     }
   }, [playbackRate]);
+
+  React.useEffect(() => {
+    isLoopingRef.current = isLooping;
+    const video = videoRef.current;
+    if (video) {
+      video.loop = isLooping;
+    }
+
+    try {
+      window.localStorage.setItem(LOOP_STORAGE_KEY, String(isLooping));
+    } catch {
+      // Ignore persistence errors (private mode / blocked storage).
+    }
+  }, [isLooping]);
 
   React.useEffect(() => {
     const detectFullscreen = (): void => {
@@ -495,7 +553,7 @@ const Main: React.FC = () => {
 
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous';
-    video.loop = true;
+    video.loop = isLoopingRef.current;
     video.playsInline = true;
     video.preload = 'auto';
     videoRef.current = video;
@@ -696,6 +754,13 @@ const Main: React.FC = () => {
       isPointerDown = false;
     };
 
+    recenterViewRef.current = (): void => {
+      lon = 0;
+      lat = 0;
+      onPointerDownLon = 0;
+      onPointerDownLat = 0;
+    };
+
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
@@ -703,7 +768,11 @@ const Main: React.FC = () => {
 
     const onVideoPlay = (): void => setIsPlaying(true);
     const onVideoPause = (): void => setIsPlaying(false);
-    const onVideoEnded = (): void => setIsPlaying(false);
+    const onVideoEnded = (): void => {
+      setIsPlaying(false);
+      // Only fires when looping is off; advance to the next queued item.
+      autoAdvanceRef.current();
+    };
     const onVideoCanPlay = (): void => {
       setLoadedMedia('video');
       setStatus('Video loaded. Use Enter VR to watch in headset.');
@@ -908,6 +977,7 @@ const Main: React.FC = () => {
       updateProjectionGeometryRef.current = () => undefined;
       updateVrModeRef.current = () => undefined;
       updateFlatMeshSizeRef.current = () => undefined;
+      recenterViewRef.current = () => undefined;
 
       if (mountEl.contains(renderer.domElement)) {
         mountEl.removeChild(renderer.domElement);
@@ -1118,6 +1188,15 @@ const Main: React.FC = () => {
         setSourceUrl(item.src);
       }
 
+      // Auto-apply projection / stereo layout when the file name advertises it.
+      const traits = detectMediaTraits(`${item.label} ${item.src}`);
+      if (traits.projection) {
+        setProjectionMode(traits.projection);
+      }
+      if (traits.stereo) {
+        setStereoLayout(traits.stereo);
+      }
+
       if (inferMediaType(item.src, item.hint) === 'image') {
         void setImageSource(item.src, requestToken, item.label);
         return;
@@ -1167,6 +1246,22 @@ const Main: React.FC = () => {
   const playPrevious = React.useCallback((): void => {
     goToIndex(currentIndexRef.current - 1);
   }, [goToIndex]);
+
+  // Keep the "video ended" handler (set up inside the renderer effect) pointed
+  // at the latest navigation logic so a finished clip advances the queue.
+  React.useEffect(() => {
+    autoAdvanceRef.current = (): void => {
+      const index = currentIndexRef.current;
+      if (index >= 0 && index < playlistRef.current.length - 1) {
+        goToIndex(index + 1);
+      }
+    };
+  }, [goToIndex]);
+
+  const recenterView = React.useCallback((): void => {
+    recenterViewRef.current();
+    setStatus('View recentered.');
+  }, []);
 
   const loadFromUrl = React.useCallback((): void => {
     const url = sourceUrl.trim();
@@ -1448,6 +1543,12 @@ const Main: React.FC = () => {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         adjustVolumeByStep(-KEYBOARD_VOLUME_STEP);
+        return;
+      }
+
+      if (event.key === 'c' || event.key === 'C') {
+        event.preventDefault();
+        recenterView();
       }
     };
 
@@ -1455,7 +1556,7 @@ const Main: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [adjustVolumeByStep, seekBySeconds, togglePlayback]);
+  }, [adjustVolumeByStep, recenterView, seekBySeconds, togglePlayback]);
 
   const canPlayPrevious = currentIndex > 0;
   const canPlayNext = currentIndex >= 0 && currentIndex < playlist.length - 1;
@@ -1490,6 +1591,7 @@ const Main: React.FC = () => {
               volume={volume}
               playbackRate={playbackRate}
               playbackRateOptions={PLAYBACK_RATE_OPTIONS}
+              isLooping={isLooping}
               playlist={playlist}
               currentIndex={currentIndex}
               canPlayPrevious={canPlayPrevious}
@@ -1515,6 +1617,8 @@ const Main: React.FC = () => {
               onVolumeChange={onVolumeChange}
               onSeekChange={onSeekChange}
               onPlaybackRateChange={setPlaybackRate}
+              onLoopChange={setIsLooping}
+              onRecenter={recenterView}
               onPlayPrevious={playPrevious}
               onPlayNext={playNext}
               onSelectPlaylistItem={selectPlaylistItem}
