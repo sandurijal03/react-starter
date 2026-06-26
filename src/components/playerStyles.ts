@@ -41,17 +41,17 @@ export const GlobalStyle = createGlobalStyle`
   }
 `;
 
-export const PlayerRoot = styled.main`
+export const PlayerRoot = styled.main<{ $immersive?: boolean }>`
   width: 100vw;
   min-height: 100vh;
   margin: 0;
-  padding: 0.65rem;
+  padding: ${({ $immersive }) => ($immersive ? '0' : '0.65rem')};
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.5rem;
 
   @media (max-width: ${MOBILE_BREAKPOINT}) {
-    padding: 0.35rem;
+    padding: ${({ $immersive }) => ($immersive ? '0' : '0.35rem')};
   }
 `;
 
@@ -590,17 +590,28 @@ export const ViewerControlsWrap = styled.div<{
 
   ${({ $floating, $visible }) =>
     $floating
-      ? `
-    position: absolute;
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
-    z-index: 30;
-    opacity: ${$visible ? '1' : '0'};
-    transform: translateY(${$visible ? '0' : '12px'});
-    pointer-events: ${$visible ? 'auto' : 'none'};
-    transition: opacity 160ms ease, transform 160ms ease;
-  `
+      ? css`
+          position: absolute;
+          left: 16px;
+          right: 16px;
+          bottom: 16px;
+          z-index: 30;
+          opacity: ${$visible ? '1' : '0'};
+          transform: translateY(${$visible ? '0' : '12px'});
+          pointer-events: ${$visible ? 'auto' : 'none'};
+          transition:
+            opacity 160ms ease,
+            transform 160ms ease;
+
+          /* No solid panel over the video in fullscreen: keep the controls
+             floating on a transparent background so the video is not cropped. */
+          ${ControlsPanel} {
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+          }
+        `
       : ''}
 `;
 

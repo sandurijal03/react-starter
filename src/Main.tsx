@@ -266,6 +266,8 @@ const Main: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = React.useState<boolean>(false);
   const [isWindowFullscreen, setIsWindowFullscreen] =
     React.useState<boolean>(false);
+  const [isWindowMaximized, setIsWindowMaximized] =
+    React.useState<boolean>(false);
 
   const setLoadedMedia = React.useCallback((value: LoadedMedia): void => {
     loadedMediaRef.current = value;
@@ -319,14 +321,25 @@ const Main: React.FC = () => {
   }, [fitMismatchThreshold]);
 
   React.useEffect(() => {
-    const onFullscreenChange = (): void => {
-      setIsFullscreen(document.fullscreenElement === playerShellRef.current);
+    const detectFullscreen = (): void => {
+      // Fullscreen API (the in-app fullscreen button).
+      const byApi = Boolean(document.fullscreenElement);
+      // Fallback for F11 / native fullscreen, which does not set
+      // document.fullscreenElement: the window fully covers the screen.
+      const bySize =
+        Math.abs(window.innerWidth - window.screen.width) <= 2 &&
+        Math.abs(window.innerHeight - window.screen.height) <= 2;
+
+      setIsFullscreen(byApi || bySize);
     };
 
-    document.addEventListener('fullscreenchange', onFullscreenChange);
+    detectFullscreen();
+    document.addEventListener('fullscreenchange', detectFullscreen);
+    window.addEventListener('resize', detectFullscreen);
 
     return () => {
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('fullscreenchange', detectFullscreen);
+      window.removeEventListener('resize', detectFullscreen);
     };
   }, []);
 
@@ -339,9 +352,13 @@ const Main: React.FC = () => {
 
     void (async () => {
       try {
-        const next = await window.electronAPI?.getWindowFullscreen();
+        const [fullscreen, maximized] = await Promise.all([
+          window.electronAPI?.getWindowFullscreen(),
+          window.electronAPI?.getWindowMaximized(),
+        ]);
         if (active) {
-          setIsWindowFullscreen(Boolean(next));
+          setIsWindowFullscreen(Boolean(fullscreen));
+          setIsWindowMaximized(Boolean(maximized));
         }
       } catch {
         // Ignore desktop bridge failures and continue with DOM fullscreen only.
@@ -353,13 +370,23 @@ const Main: React.FC = () => {
         setIsWindowFullscreen(next);
       });
 
+    const disposeWindowMaximizeListener =
+      window.electronAPI.onWindowMaximizeChange((next) => {
+        setIsWindowMaximized(next);
+      });
+
     return () => {
       active = false;
       disposeWindowFullscreenListener();
+      disposeWindowMaximizeListener();
     };
   }, [isDesktopApp]);
 
-  const isAnyFullscreen = isFullscreen || isWindowFullscreen;
+  // True fullscreen drives the fullscreen toggle button's state.
+  const isWindowedFullscreen = isFullscreen || isWindowFullscreen;
+  // A maximized window should feel just as immersive: fill the viewer and let
+  // the controls float in on hover instead of reserving a docked panel.
+  const isImmersive = isWindowedFullscreen || isWindowMaximized;
 
   React.useEffect(() => {
     const mountEl = mountRef.current;
@@ -1165,11 +1192,11 @@ const Main: React.FC = () => {
   return (
     <>
       <GlobalStyle />
-      <PlayerRoot>
+      <PlayerRoot $immersive={isImmersive}>
         <PlayerViewer
           shellRef={playerShellRef}
           mountRef={mountRef}
-          isFullscreen={isAnyFullscreen}
+          isFullscreen={isImmersive}
           controls={
             <PlayerControls
               insidePlayer
@@ -1184,7 +1211,7 @@ const Main: React.FC = () => {
               loadedMedia={loadedMedia}
               isPlaying={isPlaying}
               isMuted={isMuted}
-              isFullscreen={isAnyFullscreen}
+              isFullscreen={isWindowedFullscreen}
               volume={volume}
               timelineCurrent={timelineCurrent}
               timelineDuration={timelineDuration}

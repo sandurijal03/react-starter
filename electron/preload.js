@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   requestMediaUrl: (initialUrl) =>
     ipcRenderer.invoke('request-media-url', initialUrl),
   getWindowFullscreen: () => ipcRenderer.invoke('get-window-fullscreen'),
+  getWindowMaximized: () => ipcRenderer.invoke('get-window-maximized'),
   onMenuOpenFile: (callback) => {
     const listener = (_event, fileUrl) => callback(fileUrl);
     ipcRenderer.on('menu-open-file', listener);
@@ -25,6 +26,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('window-fullscreen-change', listener);
     return () => {
       ipcRenderer.removeListener('window-fullscreen-change', listener);
+    };
+  },
+  onWindowMaximizeChange: (callback) => {
+    const listener = (_event, isMaximized) => callback(Boolean(isMaximized));
+    ipcRenderer.on('window-maximize-change', listener);
+    return () => {
+      ipcRenderer.removeListener('window-maximize-change', listener);
     };
   },
 });

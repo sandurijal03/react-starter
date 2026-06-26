@@ -191,8 +191,21 @@ function createWindow() {
     );
   };
 
+  const sendWindowMaximizeState = () => {
+    if (mainWindow.isDestroyed()) {
+      return;
+    }
+
+    mainWindow.webContents.send(
+      'window-maximize-change',
+      mainWindow.isMaximized(),
+    );
+  };
+
   mainWindow.on('enter-full-screen', sendWindowFullscreenState);
   mainWindow.on('leave-full-screen', sendWindowFullscreenState);
+  mainWindow.on('maximize', sendWindowMaximizeState);
+  mainWindow.on('unmaximize', sendWindowMaximizeState);
 
   createAppMenu(mainWindow);
 
@@ -206,6 +219,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     sendWindowFullscreenState();
+    sendWindowMaximizeState();
     mainWindow.show();
   });
 }
@@ -223,6 +237,11 @@ app.whenReady().then(() => {
   ipcMain.handle('get-window-fullscreen', (event) => {
     const senderWindow = BrowserWindow.fromWebContents(event.sender);
     return senderWindow ? senderWindow.isFullScreen() : false;
+  });
+
+  ipcMain.handle('get-window-maximized', (event) => {
+    const senderWindow = BrowserWindow.fromWebContents(event.sender);
+    return senderWindow ? senderWindow.isMaximized() : false;
   });
 
   createWindow();

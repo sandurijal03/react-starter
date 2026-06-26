@@ -23,7 +23,7 @@
     "vr",
     "video-player"
   ],
-  "author": "Sandip Rijal",
+  "author": "Sandip Rijal <sandurijal03@hotmail.com>",
   "license": "ISC",
   "build": {
     "appId": "com.reactstarter.vrplayer",
