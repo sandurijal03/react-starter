@@ -34,10 +34,13 @@
       "output": "release",
       "buildResources": "buildResources"
     },
+    "compression": "maximum",
+    "afterPack": "scripts/afterPack.js",
     "files": [
       "build/**/*",
       "electron/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/**/*"
     ],
     "extraMetadata": {
       "main": "electron/main.js"
