@@ -392,11 +392,16 @@ const Main: React.FC = () => {
 
   React.useEffect(() => {
     const detectFullscreen = (): void => {
-      // Fullscreen API (the in-app fullscreen button).
+      // Fullscreen API (the in-app fullscreen button) is the single source of
+      // truth for DOM fullscreen.
       const byApi = Boolean(document.fullscreenElement);
-      // Fallback for F11 / native fullscreen, which does not set
-      // document.fullscreenElement: the window fully covers the screen.
+
+      // Size-based fallback for F11 / native fullscreen only matters in a plain
+      // browser. In the desktop app the native enter/leave-full-screen events
+      // already cover it, and this heuristic desyncs (taskbar / DPI rounding),
+      // so it is disabled there.
       const bySize =
+        !isDesktopApp &&
         Math.abs(window.innerWidth - window.screen.width) <= 2 &&
         Math.abs(window.innerHeight - window.screen.height) <= 2;
 
@@ -411,7 +416,7 @@ const Main: React.FC = () => {
       document.removeEventListener('fullscreenchange', detectFullscreen);
       window.removeEventListener('resize', detectFullscreen);
     };
-  }, []);
+  }, [isDesktopApp]);
 
   React.useEffect(() => {
     if (!isDesktopApp || !window.electronAPI) {
@@ -788,21 +793,28 @@ const Main: React.FC = () => {
     }
 
     const onResize = (): void => {
-      if (!mountRef.current) {
+      const width = mountEl.clientWidth;
+      const height = mountEl.clientHeight;
+      if (width === 0 || height === 0) {
         return;
       }
 
-      camera.aspect =
-        mountRef.current.clientWidth / mountRef.current.clientHeight;
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(
-        mountRef.current.clientWidth,
-        mountRef.current.clientHeight,
-      );
+      renderer.setSize(width, height);
       updateFlatMeshSize();
     };
 
     window.addEventListener('resize', onResize);
+
+    // Drive sizing from the canvas container's actual box, not just window
+    // resizes. This keeps the WebGL buffer in sync when the canvas height
+    // changes for CSS reasons (e.g. toggling fullscreen / immersive layout),
+    // which would otherwise leave the video at a stale size.
+    const resizeObserver = new ResizeObserver(() => {
+      onResize();
+    });
+    resizeObserver.observe(mountEl);
 
     setLoadedMedia('video');
     updateFlatMeshSize();
@@ -831,6 +843,7 @@ const Main: React.FC = () => {
     return () => {
       renderer.setAnimationLoop(null);
       window.removeEventListener('resize', onResize);
+      resizeObserver.disconnect();
 
       video.removeEventListener('play', onVideoPlay);
       video.removeEventListener('pause', onVideoPause);

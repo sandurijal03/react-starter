@@ -10,7 +10,7 @@
     "web:server": "webpack serve --mode development",
     "web:dev": "webpack --mode development --watch",
     "electron": "electron .",
-    "electron:dev": "concurrently -k \"npm run web:dev\" \"wait-on build/index.html && nodemon --watch build --ext js,html --exec \\\"electron .\\\"\"",
+    "electron:dev": "concurrently -k \"npm run web:dev\" \"wait-on build/bundle.js build/index.html && nodemon --watch build --ext js,html --exec \\\"electron .\\\"\"",
     "electron:dev:server": "concurrently -k \"npm run web:server\" \"wait-on tcp:5000 && cross-env ELECTRON_START_URL=http://localhost:5000 electron .\"",
     "prepackage:win": "node scripts/prepackage-win.js",
     "package:dir": "npm run build && electron-builder --dir --win",
