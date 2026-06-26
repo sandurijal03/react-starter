@@ -44,6 +44,7 @@ import {
   writeStoredPosition,
 } from './utils/storage';
 import { findActiveCue, parseSubtitles, SubtitleCue } from './utils/subtitles';
+import { createVrControls } from './utils/vrControls';
 
 type XRNavigator = Navigator & {
   xr?: {
@@ -751,12 +752,65 @@ const Main: React.FC = () => {
     });
     resizeObserver.observe(mountEl);
 
+    // In-headset 3D control panel (controller laser + trigger, gaze-dwell
+    // fallback) for play/pause, seek and recentering without leaving VR.
+    const vrControls = createVrControls(renderer, scene, camera, {
+      getMediaState: () => ({
+        isPaused: video.paused,
+        isMuted: video.muted,
+        currentTime: video.currentTime || 0,
+        duration: Number.isFinite(video.duration) ? video.duration : 0,
+      }),
+      togglePlay: () => {
+        if (loadedMediaRef.current !== 'video') {
+          return;
+        }
+        if (video.paused) {
+          void video.play();
+        } else {
+          video.pause();
+        }
+      },
+      toggleMute: () => {
+        video.muted = !video.muted;
+        setIsMuted(video.muted);
+      },
+      seekBy: (seconds) => {
+        if (
+          loadedMediaRef.current !== 'video' ||
+          !Number.isFinite(video.duration) ||
+          video.duration <= 0
+        ) {
+          return;
+        }
+        video.currentTime = Math.min(
+          video.duration,
+          Math.max(0, video.currentTime + seconds),
+        );
+      },
+      seekToRatio: (ratio) => {
+        if (
+          loadedMediaRef.current !== 'video' ||
+          !Number.isFinite(video.duration) ||
+          video.duration <= 0
+        ) {
+          return;
+        }
+        video.currentTime = Math.min(
+          video.duration,
+          Math.max(0, ratio * video.duration),
+        );
+      },
+    });
+
     setLoadedMedia('video');
     updateFlatMeshSize();
     syncVrUi();
     setMeshVisibility();
 
     renderer.setAnimationLoop(() => {
+      vrControls.update();
+
       if (!vrModeEnabledRef.current) {
         camera.lookAt(0, 0, -1);
         renderer.render(scene, camera);
@@ -777,6 +831,7 @@ const Main: React.FC = () => {
 
     return () => {
       renderer.setAnimationLoop(null);
+      vrControls.dispose();
       window.removeEventListener('resize', onResize);
       resizeObserver.disconnect();
 
