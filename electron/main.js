@@ -150,7 +150,18 @@ function createAppMenu(mainWindow) {
           },
         },
         { type: 'separator' },
-        { role: 'quit' },
+        {
+          label: 'Quit',
+          // Both Ctrl+Q and Ctrl+W quit the app (W mirrors the usual
+          // close-window shortcut since this is a single-window app).
+          accelerator: 'CmdOrCtrl+Q',
+          click: () => app.quit(),
+        },
+        {
+          label: 'Close Window',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => app.quit(),
+        },
       ],
     },
     {
