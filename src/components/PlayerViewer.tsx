@@ -22,7 +22,6 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
   const [showFloatingControls, setShowFloatingControls] =
     React.useState<boolean>(true);
   const hideTimerRef = React.useRef<number | null>(null);
-  const pointerOverControlsRef = React.useRef<boolean>(false);
 
   const clearHideTimer = React.useCallback((): void => {
     if (hideTimerRef.current !== null) {
@@ -31,14 +30,12 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
     }
   }, []);
 
+  // Hide purely on inactivity: the bar fades out a fixed delay after the last
+  // pointer movement, no matter where the cursor rests (including on the bar
+  // itself). Any movement brings it back.
   const scheduleHide = React.useCallback((): void => {
     clearHideTimer();
     hideTimerRef.current = window.setTimeout(() => {
-      // Never hide while the pointer is resting on the control bar itself.
-      if (pointerOverControlsRef.current) {
-        return;
-      }
-
       setShowFloatingControls(false);
     }, CONTROLS_IDLE_TIMEOUT_MS);
   }, [clearHideTimer]);
@@ -69,31 +66,6 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
     scheduleHide();
   }, [isFullscreen, scheduleHide]);
 
-  const onViewerMouseMove = (): void => {
-    revealControls();
-  };
-
-  const onViewerTouchStart = (): void => {
-    revealControls();
-  };
-
-  const onControlsPointerEnter = (): void => {
-    pointerOverControlsRef.current = true;
-
-    if (isFullscreen) {
-      clearHideTimer();
-      setShowFloatingControls(true);
-    }
-  };
-
-  const onControlsPointerLeave = (): void => {
-    pointerOverControlsRef.current = false;
-
-    if (isFullscreen) {
-      scheduleHide();
-    }
-  };
-
   const showControls = !isFullscreen || showFloatingControls;
 
   return (
@@ -101,8 +73,8 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
       ref={shellRef as React.RefObject<HTMLDivElement>}
       $isFullscreen={isFullscreen}
       $hideCursor={isFullscreen && !showControls}
-      onMouseMove={onViewerMouseMove}
-      onTouchStart={onViewerTouchStart}
+      onMouseMove={revealControls}
+      onTouchStart={revealControls}
     >
       <ViewerCanvas ref={mountRef} $isFullscreen={isFullscreen} />
       {controls ? (
@@ -110,8 +82,6 @@ const PlayerViewer: React.FC<PlayerViewerProps> = ({
           $floating={isFullscreen}
           $visible={showControls}
           aria-hidden={!showControls}
-          onMouseEnter={onControlsPointerEnter}
-          onMouseLeave={onControlsPointerLeave}
         >
           {controls}
         </ViewerControlsWrap>
