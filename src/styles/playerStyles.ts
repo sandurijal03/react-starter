@@ -84,7 +84,7 @@ export const HeroPanel = styled.section`
 
 export const ControlsPanel = styled.section<{ $insidePlayer?: boolean }>`
   ${panelSurface}
-  padding: 0.62rem;
+  padding: 0.4rem 0.5rem;
 
   ${({ $insidePlayer }) =>
     $insidePlayer
@@ -110,15 +110,15 @@ export const CompactToolbar = styled.div`
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.42rem;
-  margin-bottom: 0.52rem;
+  gap: 0.34rem;
+  margin-bottom: 0.3rem;
 `;
 
 export const ToolbarGroup = styled.div`
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  min-height: 34px;
+  gap: 0.3rem;
+  min-height: 30px;
 `;
 
 export const CompactSelect = styled.select`
@@ -142,8 +142,8 @@ export const CompactSelect = styled.select`
 `;
 
 export const IconButton = styled.button<{ $active?: boolean }>`
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -161,8 +161,8 @@ export const IconButton = styled.button<{ $active?: boolean }>`
     box-shadow 120ms ease;
 
   svg {
-    width: 17px;
-    height: 17px;
+    width: 15px;
+    height: 15px;
     fill: currentColor;
   }
 
@@ -180,8 +180,8 @@ export const IconButton = styled.button<{ $active?: boolean }>`
 `;
 
 export const IconFileLabel = styled.label`
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -196,8 +196,8 @@ export const IconFileLabel = styled.label`
     box-shadow 120ms ease;
 
   svg {
-    width: 17px;
-    height: 17px;
+    width: 15px;
+    height: 15px;
     fill: currentColor;
   }
 
@@ -219,8 +219,8 @@ export const MenuPopover = styled.details`
 
 export const MenuPopoverButton = styled.summary<{ $active?: boolean }>`
   list-style: none;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -234,8 +234,8 @@ export const MenuPopoverButton = styled.summary<{ $active?: boolean }>`
   cursor: pointer;
 
   svg {
-    width: 17px;
-    height: 17px;
+    width: 15px;
+    height: 15px;
     fill: currentColor;
   }
 
@@ -587,8 +587,8 @@ export const TimelineRow = styled.div`
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 0.6rem;
-  margin-top: 0.45rem;
+  gap: 0.5rem;
+  margin-top: 0.28rem;
 
   label {
     margin: 0;
@@ -635,14 +635,14 @@ export const TimelineText = styled.span`
 `;
 
 export const StatusText = styled.p`
-  margin: 0.38rem 0 0;
-  font-size: 0.8rem;
+  margin: 0.22rem 0 0;
+  font-size: 0.74rem;
   color: #dde1e7;
 `;
 
 export const StatusSubtle = styled.p`
-  margin: 0.17rem 0 0;
-  font-size: 0.72rem;
+  margin: 0.08rem 0 0;
+  font-size: 0.68rem;
   color: var(--ink-soft);
 `;
 

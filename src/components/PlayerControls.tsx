@@ -696,10 +696,9 @@ const PlayerControls: React.FC<PlayerControlsProps> = ({
       </TimelineRow>
 
       <StatusText>{status}</StatusText>
-      <StatusSubtle>Loaded media: {loadedMedia ?? "none"}</StatusSubtle>
       <StatusSubtle>
-        WebXR support:{" "}
-        {xrSupported === null ? "checking..." : xrSupported ? "yes" : "no"}
+        {loadedMedia ?? "none"} · WebXR{" "}
+        {xrSupported === null ? "checking…" : xrSupported ? "yes" : "no"}
       </StatusSubtle>
     </ControlsPanel>
   );
