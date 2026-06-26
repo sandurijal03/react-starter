@@ -1,71 +1,17 @@
 {
   "name": "react-starter",
   "version": "1.0.0",
-  "description": "Desktop VR video and panorama player built with Electron, React, and Three.js.",
-  "main": "electron/main.js",
+  "description": "Minimal React + TypeScript + webpack starter.",
   "scripts": {
     "build": "webpack --mode production",
-    "webpack": "webpack",
     "serve": "webpack serve --mode development",
-    "web:server": "webpack serve --mode development",
-    "web:dev": "webpack --mode development --watch",
-    "electron": "electron .",
-    "electron:dev": "concurrently -k \"npm run web:dev\" \"wait-on build/bundle.js build/index.html && nodemon --watch build --ext js,html --exec \\\"electron .\\\"\"",
-    "electron:dev:server": "concurrently -k \"npm run web:server\" \"wait-on tcp:5000 && cross-env ELECTRON_START_URL=http://localhost:5000 electron .\"",
-    "prepackage:win": "node scripts/prepackage-win.js",
-    "package:dir": "npm run build && electron-builder --dir --win",
-    "package:win": "npm run build && node scripts/package-win.js"
+    "web:dev": "webpack --mode development --watch"
   },
   "keywords": [
-    "electron",
-    "react",
-    "threejs",
-    "vr",
-    "video-player"
+    "react"
   ],
   "author": "Sandip Rijal <sandurijal03@hotmail.com>",
   "license": "ISC",
-  "build": {
-    "appId": "com.reactstarter.vrplayer",
-    "productName": "VR Player App",
-    "artifactName": "${productName}-Setup-${version}.${ext}",
-    "copyright": "Copyright (c) 2026 Sandip Rijal",
-    "directories": {
-      "output": "release",
-      "buildResources": "buildResources"
-    },
-    "compression": "maximum",
-    "afterPack": "scripts/afterPack.js",
-    "files": [
-      "build/**/*",
-      "electron/**/*",
-      "package.json",
-      "!node_modules/**/*"
-    ],
-    "extraMetadata": {
-      "main": "electron/main.js"
-    },
-    "win": {
-      "signAndEditExecutable": false,
-      "icon": "buildResources/icon.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "buildResources/icon.ico",
-      "uninstallerIcon": "buildResources/icon.ico",
-      "installerHeaderIcon": "buildResources/icon.ico",
-      "shortcutName": "VR Player App"
-    }
-  },
   "devDependencies": {
     "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
@@ -73,28 +19,19 @@
     "@babel/preset-typescript": "^7.29.7",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@types/three": "^0.184.0",
     "babel-loader": "^10.1.1",
-    "concurrently": "^9.1.0",
-    "cross-env": "^7.0.3",
     "css-loader": "^7.1.4",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
     "html-webpack-plugin": "^5.6.7",
-    "nodemon": "^3.1.7",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.6.0",
     "typescript": "^6.0.3",
-    "wait-on": "^8.0.1",
     "webpack": "^5.107.2",
     "webpack-cli": "^7.0.3",
     "webpack-dev-server": "^5.2.4"
   },
   "dependencies": {
-    "hls.js": "^1.6.16",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "styled-components": "^6.4.2",
-    "three": "^0.184.0"
+    "styled-components": "^6.4.2"
   }
 }

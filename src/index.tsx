@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 
-import Main from './Main';
+import App from './App';
 
 createRoot(document.querySelector('#root')!).render(
   <React.StrictMode>
-    <Main />
+    <App />
   </React.StrictMode>,
 );
